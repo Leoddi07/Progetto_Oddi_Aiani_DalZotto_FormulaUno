@@ -192,14 +192,6 @@ export default function LoginPage() {
             <button className="btn-secondary" onClick={() => setShowRegister(true)}>
               Crea un nuovo account
             </button>
-
-            {/* Info account di default */}
-            <div className="info-box" style={{ marginTop: 20 }}>
-              <strong style={{ color: '#ff8700' }}>Account default admin:</strong><br />
-              <span style={{ fontFamily: 'monospace', fontSize: 13 }}>
-                username: admin • password: admin
-              </span>
-            </div>
           </div>
         )}
       </div>
