@@ -117,7 +117,7 @@ export default function LoginPage() {
           <span style={styles.logoIcon}>▶</span>
           <div>
             <div style={styles.logoTitle}>FANalytics</div>
-            <div style={styles.logoSub}>Israel-based 🇮🇱</div>
+            <div style={styles.logoSub}>Italy-based 🇮🇱</div>
           </div>
         </div>
 
