@@ -1,7 +1,7 @@
 // rotte/drivers.js — Endpoint piloti
 //
-// GET /api/drivers      → classifica piloti ordinata per punti
-// GET /api/drivers/:id  → dettaglio singolo pilota
+// GET /api/drivers      - classifica piloti ordinata per punti
+// GET /api/drivers/:id  - dettaglio singolo pilota
 
 // Nomi colonne DB (da F1.sql): elimina pls che serve solo per roferimento
 //   pilota:   id_pilota, nome, cognome, nazionalità, numero, id_scuderia_FK

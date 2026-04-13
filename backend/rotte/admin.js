@@ -2,13 +2,13 @@
 // rotte/admin.js — Endpoint pannello amministrazione
 // Tutti richiedono: login + ruolo admin
 
-// GET    /api/admin/users              → lista utenti
-// DELETE /api/admin/users/:id          → elimina utente
-// PUT    /api/admin/users/:id/reset    → reset password
-// POST   /api/admin/refresh/:type      → aggiorna dati da API F1
-// PUT    /api/admin/data               → modifica manuale dato DB
-// PUT    /api/admin/team-power         → aggiorna indice_potenza scuderia
-// PUT    /api/admin/circuit-index      → aggiorna indice_imprevedibilità circuito
+// GET    /api/admin/users              - lista utenti
+// DELETE /api/admin/users/:id          - elimina utente
+// PUT    /api/admin/users/:id/reset    - reset password
+// POST   /api/admin/refresh/:type      - aggiorna dati da API F1
+// PUT    /api/admin/data               - modifica manuale dato DB
+// PUT    /api/admin/team-power         - aggiorna indice_potenza scuderia
+// PUT    /api/admin/circuit-index      - aggiorna indice_imprevedibilità circuito
 //
 // indice_potenza e indice_imprevedibilità sono gestiti
 // SOLO da questi endpoint admin dedicati, e non vengono quindi inseriti dal data-engineering

@@ -1,6 +1,6 @@
 // rotte/auth.js — Endpoint di autenticazione
-// POST /api/auth/login    → login utente
-// POST /api/auth/register → registrazione nuovo utente
+// POST /api/auth/login    - login utente
+// POST /api/auth/register - registrazione nuovo utente
 
 const express  = require('express')
 const router   = express.Router()
