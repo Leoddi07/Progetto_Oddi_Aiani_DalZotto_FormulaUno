@@ -4,6 +4,7 @@
 // del GP selezionato, i tempi pit stop medi e statistiche.
 //
 //     BACKEND: getRaces(), getRaceResults(id), getPitStopStats()
+//    Tutti gli endpoint sono in src/services/api.js
 
 
 import React, { useState, useEffect } from 'react'
