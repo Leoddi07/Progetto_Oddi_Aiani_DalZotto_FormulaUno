@@ -13,10 +13,10 @@
 // indice_potenza e indice_imprevedibilità sono gestiti
 // SOLO da questi endpoint admin dedicati, e non vengono quindi inseriti dal data-engineering
 
-const express  = require('express')
-const router   = express.Router()
-const bcrypt   = require('bcrypt')
-const db       = require('../models/db')
+const express = require('express')
+const router  = express.Router()
+const bcrypt  = require('bcrypt')
+const db      = require('../models/db')
 const { requireAuth, requireAdmin } = require('../middleware/auth')
 
 router.use(requireAuth, requireAdmin)
@@ -25,7 +25,7 @@ router.use(requireAuth, requireAdmin)
 router.get('/users', async (req, res) => {
   try {
     const [rows] = await db.query(
-      'SELECT id, username, email, ruolo AS role FROM utenti ORDER BY id'
+      'SELECT id_utente AS id, username, email, ruolo AS role FROM utente ORDER BY id_utente'
     )
     res.json(rows)
   } catch (err) {
@@ -40,7 +40,7 @@ router.delete('/users/:id', async (req, res) => {
     return res.status(400).json({ error: 'Non puoi eliminare il tuo stesso account' })
   }
   try {
-    await db.query('DELETE FROM utenti WHERE id = ?', [req.params.id])
+    await db.query('DELETE FROM utente WHERE id_utente = ?', [req.params.id])
     res.json({ success: true })
   } catch (err) {
     console.error('[admin/users DELETE]', err)
@@ -49,11 +49,13 @@ router.delete('/users/:id', async (req, res) => {
 })
 
 // PUT /api/admin/users/:id/reset
+// Imposta password temporanea
 router.put('/users/:id/reset', async (req, res) => {
   const tempPassword = 'FANalytics'
   try {
     const hash = await bcrypt.hash(tempPassword, 10)
-    await db.query('UPDATE utenti SET password_hash = ? WHERE id = ?', [hash, req.params.id])
+    // Il campo si chiama 'password' (non password_hash) nel DB definitivo
+    await db.query('UPDATE utente SET password = ? WHERE id_utente = ?', [hash, req.params.id])
     res.json({ success: true, tempPassword })
   } catch (err) {
     console.error('[admin/users reset]', err)
@@ -77,18 +79,17 @@ router.post('/refresh/:type', async (req, res) => {
 })
 
 // PUT /api/admin/data
-// Modifica generica di un campo in una tabella (whitelist sicura)
+// Modifica generica con whitelist campi per sicurezza
 router.put('/data', async (req, res) => {
   const { table, recordId, field, value } = req.body
   if (!table || !recordId || !field || value === undefined) {
     return res.status(400).json({ error: 'table, recordId, field, value obbligatori' })
   }
 
-  // Whitelist tabelle + campi ammessi per ogni tabella
-  // (NON include indice_potenza e indice_imprevedibilità — hanno endpoint dedicati)
+  // Whitelist: tabella - campi modificabili
   const ALLOWED = {
-    pilota:    ['nome', 'cognome', 'nazionalità', 'numero'],
-    scuderia:  ['nome', 'nazionalità_s', 'punti_totali'],
+    pilota:    ['nome', 'cognome', 'nazionalita', 'numero'],
+    scuderia:  ['nome', 'nazionalita', 'punti_totali'],
     circuito:  ['nome', 'paese', 'lunghezza_tracciato', 'tipologia'],
     gara:      ['nome_gara_premio', 'data'],
     risultato: ['posizione_arrivo', 'punti_ottenuti', 'giro_veloce', 'tempo_totale'],
@@ -103,7 +104,6 @@ router.put('/data', async (req, res) => {
     return res.status(400).json({ error: `Campo non consentito: ${field}` })
   }
 
-  // PK name per ogni tabella
   const PK = {
     pilota: 'id_pilota', scuderia: 'id_scuderia', circuito: 'id_circuito',
     gara: 'id_gara', risultato: 'id_risultato', pitstop: 'id_pitstop',
@@ -131,7 +131,7 @@ router.put('/team-power', async (req, res) => {
   }
   const val = parseFloat(value)
   if (isNaN(val) || val < 0 || val > 100) {
-    return res.status(400).json({ error: 'value deve essere un numero tra 0 e 100' })
+    return res.status(400).json({ error: 'value deve essere tra 0 e 100' })
   }
   try {
     await db.query(
@@ -145,9 +145,8 @@ router.put('/team-power', async (req, res) => {
   }
 })
 
-
 // PUT /api/admin/circuit-index
-// Aggiorna indice_imprevedibilità di un circuito (solo admin)
+// Aggiorna indice_imprevedibilita di un circuito (solo admin)
 // Body: { circuitId: 7, value: 0.80 }
 router.put('/circuit-index', async (req, res) => {
   const { circuitId, value } = req.body
@@ -156,17 +155,17 @@ router.put('/circuit-index', async (req, res) => {
   }
   const val = parseFloat(value)
   if (isNaN(val) || val < 0 || val > 1) {
-    return res.status(400).json({ error: 'value deve essere un numero tra 0.00 e 1.00' })
+    return res.status(400).json({ error: 'value deve essere tra 0.00 e 1.00' })
   }
   try {
     await db.query(
-      'UPDATE circuito SET `indice_imprevedibilità` = ? WHERE id_circuito = ?',
+      'UPDATE circuito SET indice_imprevedibilita = ? WHERE id_circuito = ?',
       [val, circuitId]
     )
-    res.json({ success: true, message: `indice_imprevedibilità circuito ${circuitId} = ${val}` })
+    res.json({ success: true, message: `indice_imprevedibilita circuito ${circuitId} = ${val}` })
   } catch (err) {
     console.error('[admin/circuit-index]', err)
-    res.status(500).json({ error: 'Errore aggiornamento indice imprevedibilità' })
+    res.status(500).json({ error: 'Errore aggiornamento indice imprevedibilita' })
   }
 })
 

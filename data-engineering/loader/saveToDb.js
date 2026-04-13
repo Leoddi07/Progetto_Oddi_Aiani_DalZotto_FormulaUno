@@ -37,10 +37,8 @@ export async function closeDb() {
   if (pool) { await pool.end(); console.log('   [db] Connessione chiusa') }
 }
 
-// ============================================================
-// saveTeams
-// NON tocca indice_potenza — impostato manualmente dall'admin
-// ============================================================
+// ---- saveTeams ----
+// NON tocca indice_potenza — impostato dall'admin
 export async function saveTeams(teams) {
   if (!teams.length) return
   const db = getDb()
@@ -48,21 +46,17 @@ export async function saveTeams(teams) {
 
   for (const team of teams) {
     await db.query(`
-      INSERT INTO scuderia (nome, \`nazionalità_s\`, punti_totali)
+      INSERT INTO scuderia (nome, nazionalita, punti_totali)
       VALUES (?, ?, 0)
       ON DUPLICATE KEY UPDATE
-        \`nazionalità_s\` = VALUES(\`nazionalità_s\`)
-        -- indice_potenza non aggiornato: è gestito dall'admin
-    `, [team.nome, team['nazionalità_s']])
+        nazionalita = VALUES(nazionalita)
+    `, [team.nome, team.nazionalita])
     saved++
   }
   console.log(`   [db] Scuderie: ${saved}`)
 }
 
-// ============================================================
-// saveDrivers
-// Cerca id_scuderia_FK tramite nome scuderia
-// ============================================================
+// ---- saveDrivers ----
 export async function saveDrivers(drivers) {
   if (!drivers.length) return
   const db = getDb()
@@ -80,28 +74,22 @@ export async function saveDrivers(drivers) {
     }
 
     await db.query(`
-      INSERT INTO pilota (nome, cognome, \`nazionalità\`, numero, id_scuderia_FK)
+      INSERT INTO pilota (nome, cognome, nazionalita, numero, id_scuderia_FK)
       VALUES (?, ?, ?, ?, ?)
       ON DUPLICATE KEY UPDATE
-        nome            = VALUES(nome),
-        cognome         = VALUES(cognome),
-        \`nazionalità\` = VALUES(\`nazionalità\`),
-        numero          = VALUES(numero),
-        id_scuderia_FK  = VALUES(id_scuderia_FK)
-    `, [
-      driver.nome, driver.cognome,
-      driver['nazionalità'], driver.numero,
-      teams[0].id_scuderia
-    ])
+        nome           = VALUES(nome),
+        cognome        = VALUES(cognome),
+        nazionalita    = VALUES(nazionalita),
+        numero         = VALUES(numero),
+        id_scuderia_FK = VALUES(id_scuderia_FK)
+    `, [driver.nome, driver.cognome, driver.nazionalita, driver.numero, teams[0].id_scuderia])
     saved++
   }
   console.log(`   [db] Piloti: ${saved} salvati, ${skipped} saltati`)
 }
 
-// ============================================================
-// saveCircuits
-// NON tocca indice_imprevedibilità — impostato dall'admin
-// ============================================================
+// ---- saveCircuits ----
+// NON tocca indice_imprevedibilita — impostato dall'admin
 export async function saveCircuits(circuits) {
   if (!circuits.length) return
   const db = getDb()
@@ -112,19 +100,16 @@ export async function saveCircuits(circuits) {
       INSERT INTO circuito (nome, paese, lunghezza_tracciato, tipologia)
       VALUES (?, ?, ?, ?)
       ON DUPLICATE KEY UPDATE
-        paese                = VALUES(paese),
-        lunghezza_tracciato  = VALUES(lunghezza_tracciato),
-        tipologia            = VALUES(tipologia)
-        -- indice_imprevedibilità non aggiornato: è gestito dall'admin
+        paese               = VALUES(paese),
+        lunghezza_tracciato = VALUES(lunghezza_tracciato),
+        tipologia           = VALUES(tipologia)
     `, [c.nome, c.paese, c.lunghezza_tracciato || 0.00, c.tipologia])
     saved++
   }
   console.log(`   [db] Circuiti: ${saved}`)
 }
 
-// ============================================================
-// saveRaces
-// ============================================================
+// ---- saveRaces ----
 export async function saveRaces(races) {
   if (!races.length) return []
   const db = getDb()
@@ -149,7 +134,6 @@ export async function saveRaces(races) {
         data             = VALUES(data)
     `, [race.nome_gara_premio, race.data, circuits[0].id_circuito])
 
-    // Recupera id_gara appena inserita
     const [inserted] = await db.query(
       'SELECT id_gara FROM gara WHERE nome_gara_premio = ? AND data = ?',
       [race.nome_gara_premio, race.data]
@@ -161,15 +145,12 @@ export async function saveRaces(races) {
   return races
 }
 
-// ============================================================
-// saveRaceResults — Risultati e pit stop
-// Cerca id_pilota_FK tramite nome+cognome o numero
-// ============================================================
+// ---- saveRaceResults ----
 export async function saveRaceResults({ results, pitStops }) {
   const db = getDb()
   let savedRes = 0, savedPit = 0
 
-  // Helper: trova id_pilota dal nome/cognome o numero
+  // Cerca id_pilota per numero di gara (più affidabile) o nome+cognome
   async function findPilota(entry) {
     if (entry.pilota_numero) {
       const [r] = await db.query(
@@ -188,14 +169,12 @@ export async function saveRaceResults({ results, pitStops }) {
     return null
   }
 
-  // --- risultato ---
   for (const r of results) {
     const id_pilota = await findPilota(r)
     if (!id_pilota) {
-      console.warn(`   [db] Pilota non trovato per risultato: ${r.pilota_nome} ${r.pilota_cognome}`)
+      console.warn(`   [db] Pilota non trovato: ${r.pilota_nome} ${r.pilota_cognome}`)
       continue
     }
-
     await db.query(`
       INSERT INTO risultato
         (posizione_arrivo, punti_ottenuti, giro_veloce, tempo_totale,
@@ -206,23 +185,18 @@ export async function saveRaceResults({ results, pitStops }) {
         punti_ottenuti   = VALUES(punti_ottenuti),
         giro_veloce      = VALUES(giro_veloce),
         tempo_totale     = VALUES(tempo_totale)
-    `, [
-      r.posizione_arrivo, r.punti_ottenuti, r.giro_veloce,
-      r.tempo_totale, id_pilota, r.id_gara
-    ])
+    `, [r.posizione_arrivo, r.punti_ottenuti, r.giro_veloce,
+        r.tempo_totale, id_pilota, r.id_gara])
     savedRes++
   }
 
-  // --- pitstop ---
   for (const ps of pitStops) {
     const id_pilota = await findPilota(ps)
     if (!id_pilota) continue
-
     await db.query(`
       INSERT INTO pitstop (numero_stop, tempo_pitstop, id_pilota_FK, id_gara_FK)
       VALUES (?, ?, ?, ?)
-      ON DUPLICATE KEY UPDATE
-        tempo_pitstop = VALUES(tempo_pitstop)
+      ON DUPLICATE KEY UPDATE tempo_pitstop = VALUES(tempo_pitstop)
     `, [ps.numero_stop, ps.tempo_pitstop, id_pilota, ps.id_gara])
     savedPit++
   }
@@ -232,10 +206,8 @@ export async function saveRaceResults({ results, pitStops }) {
   }
 }
 
-// ============================================================
-// updateTeamPoints — Ricalcola punti_totali scuderia dai risultati
-// Da chiamare dopo aver salvato tutti i risultati
-// ============================================================
+// ---- updateTeamPoints ----
+// Ricalcola punti_totali scuderia sommando i risultati
 export async function updateTeamPoints() {
   const db = getDb()
   await db.query(`
