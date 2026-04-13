@@ -4,7 +4,7 @@
 
 Interfaccia web della piattaforma, sviluppata in **React 18 + Vite**.
 
-**Responsabile:** [nome membro del gruppo]
+**Responsabile:** Aiani
 
 ---
 
