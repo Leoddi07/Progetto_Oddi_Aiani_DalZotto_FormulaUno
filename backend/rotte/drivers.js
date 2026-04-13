@@ -10,7 +10,7 @@
 
 const express = require('express')
 const router  = express.Router()
-const db      = require('../models/db')
+const db      = require('../db')
 
 // GET /api/drivers
 router.get('/', async (req, res) => {

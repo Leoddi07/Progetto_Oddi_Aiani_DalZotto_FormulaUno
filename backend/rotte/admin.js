@@ -16,7 +16,7 @@
 const express = require('express')
 const router  = express.Router()
 const bcrypt  = require('bcrypt')
-const db      = require('../models/db')
+const db      = require('../db')
 const { requireAuth, requireAdmin } = require('../middleware/auth')
 
 router.use(requireAuth, requireAdmin)

@@ -13,6 +13,9 @@
 //   1. scraper/  → chiama F1api.dev e restituisce dati grezzi
 //   2. cleaner/  → pulisce e normalizza i dati
 //   3. loader/   → inserisce i dati nel database MySQL
+//
+//
+// si avvia con "node index.js" dalla cartella data-engineering
 // ============================================================
 
 import 'dotenv/config'

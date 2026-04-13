@@ -10,7 +10,7 @@
 
 const express = require('express')
 const router  = express.Router()
-const db      = require('../models/db')
+const db      = require('../db')
 
 // GET /api/teams
 // Usa punti_totali dalla tabella scuderia
