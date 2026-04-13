@@ -1,0 +1,18 @@
+{
+  "name": "fanalytics-data-engineering",
+  "version": "1.0.0",
+  "description": "Raccolta, pulizia e inserimento dati F1 da F1api.dev",
+  "main": "index.js",
+  "type": "module",
+  "scripts": {
+    "start": "node index.js",
+    "fetch-drivers": "node index.js --only=drivers",
+    "fetch-races":   "node index.js --only=races",
+    "fetch-all":     "node index.js"
+  },
+  "dependencies": {
+    "mysql2": "^3.6.0",
+    "dotenv": "^16.3.1",
+    "node-fetch": "^3.3.2"
+  }
+}
