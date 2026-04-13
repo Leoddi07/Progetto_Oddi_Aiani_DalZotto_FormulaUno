@@ -16,9 +16,9 @@
 // ============================================================
 
 import 'dotenv/config'
-import { fetchDriversAndTeams, fetchRaces, fetchRaceResults, fetchNextRace } from './scrapers/f1ApiScraper.js'
-import { cleanDrivers, cleanTeams, cleanRaces, cleanRaceResults, cleanNextRace } from './cleaners/dataCleaner.js'
-import { saveTeams, saveDrivers, saveCircuits, saveRaces, saveRaceResults, closeDb } from './loaders/saveToDb.js'
+import { fetchDriversAndTeams, fetchRaces, fetchRaceResults, fetchNextRace } from './scraper/f1ApiScraper.js'
+import { cleanDrivers, cleanTeams, cleanRaces, cleanRaceResults, cleanNextRace } from './cleaner/dataCleaner.js'
+import { saveTeams, saveDrivers, saveCircuits, saveRaces, saveRaceResults, closeDb } from './loader/saveToDb.js'
 
 // Argomento opzionale --only=drivers|races
 const args   = process.argv.slice(2)
