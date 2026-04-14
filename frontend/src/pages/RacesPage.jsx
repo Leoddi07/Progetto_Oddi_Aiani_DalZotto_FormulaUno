@@ -1,7 +1,4 @@
 // src/pages/RacesPage.jsx
-//
-// Pagina "Gare" - mostra il calendario gare, i risultati
-// del GP selezionato, i tempi pit stop medi e statistiche.
 
 import React, { useState, useEffect } from 'react'
 import { getRaces, getRaceResults, getPitStopStats } from '../services/api.js'
@@ -12,8 +9,17 @@ function fmtDate(dateStr) {
   return new Date(dateStr).toLocaleDateString('it-IT', { day: '2-digit', month: 'short' })
 }
 
+function formatPitStop(value) {
+  return value == null ? '-' : `${Number(value).toFixed(2)}s`
+}
+
+function formatFastestLap(value) {
+  return value || '-'
+}
+
 function RaceDetail({ race, results }) {
   if (!race) return null
+
   return (
     <div className="card" style={{ marginBottom: 20 }}>
       <h3 style={{ fontSize: 18, fontWeight: 900, marginBottom: 16 }}>
@@ -22,11 +28,11 @@ function RaceDetail({ race, results }) {
 
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(5, 1fr)', gap: 16, marginBottom: 20 }}>
         {[
-          { label: 'Vincitore', value: results[0]?.driverName || race.winner },
-          { label: 'Team', value: results[0]?.team || race.winnerTeam },
+          { label: 'Vincitore', value: results[0]?.driverName || race.winner || '-' },
+          { label: 'Team', value: results[0]?.team || race.winnerTeam || '-' },
           { label: 'Giri totali', value: '-' },
           { label: 'Distanza', value: '-' },
-          { label: 'Giro veloce', value: race.fastestLap },
+          { label: 'Giro veloce', value: formatFastestLap(race.fastestLap) },
         ].map(({ label, value }) => (
           <div key={label}>
             <div style={{ fontSize: 11, color: '#555', textTransform: 'uppercase', letterSpacing: 1, marginBottom: 4 }}>{label}</div>
@@ -134,10 +140,10 @@ export default function RacesPage() {
               <div style={{ color: '#555', fontSize: 12 }}>{fmtDate(race.date)}</div>
             </div>
             <div style={{ color: '#a0a0a0', fontSize: 13 }}>{fmtDate(race.date)}</div>
-            <div style={{ fontWeight: 600 }}>{race.winner}</div>
-            <div style={{ color: '#a0a0a0', fontSize: 13 }}>{race.winnerTeam}</div>
-            <div className="laptime">{race.fastestLap}</div>
-            <div><span className="pitstop-badge">{race.avgPitStop}s</span></div>
+            <div style={{ fontWeight: 600 }}>{race.winner || '-'}</div>
+            <div style={{ color: '#a0a0a0', fontSize: 13 }}>{race.winnerTeam || '-'}</div>
+            <div className="laptime">{formatFastestLap(race.fastestLap)}</div>
+            <div><span className="pitstop-badge">{formatPitStop(race.avgPitStop)}</span></div>
           </div>
         ))}
 
@@ -155,7 +161,7 @@ export default function RacesPage() {
             <div key={p.team} style={{ marginBottom: 14 }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 6, fontSize: 14 }}>
                 <span style={{ fontWeight: 600 }}>{p.team}</span>
-                <span style={{ color: '#00d2be', fontFamily: 'monospace' }}>{p.avgTime}s</span>
+                <span style={{ color: '#00d2be', fontFamily: 'monospace' }}>{formatPitStop(p.avgTime)}</span>
               </div>
               <div style={{ height: 8, background: '#2a2a2a', borderRadius: 4, overflow: 'hidden' }}>
                 <div style={{
@@ -177,7 +183,7 @@ export default function RacesPage() {
               { label: 'Gare completate', value: `${races.length}/24` },
               { label: 'Safety Car totali', value: '4' },
               { label: 'Ritiri totali', value: '18' },
-              { label: 'Giro Veloce rec.', value: races[0]?.fastestLap || '-' },
+              { label: 'Giro Veloce rec.', value: formatFastestLap(races[0]?.fastestLap) },
             ].map(({ label, value }) => (
               <div key={label}>
                 <div style={{ fontSize: 11, color: '#555', textTransform: 'uppercase', letterSpacing: 1, marginBottom: 4 }}>

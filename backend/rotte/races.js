@@ -121,6 +121,7 @@ router.get('/pitstops', async (req, res) => {
       JOIN pilota p   ON ps.id_pilota_FK  = p.id_pilota
       JOIN scuderia s ON p.id_scuderia_FK = s.id_scuderia
       GROUP BY s.id_scuderia, s.nome
+      HAVING avgTime IS NOT NULL
       ORDER BY avgTime ASC
     `)
     res.json(rows)

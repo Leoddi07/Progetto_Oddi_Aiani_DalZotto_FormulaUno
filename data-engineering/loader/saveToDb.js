@@ -102,6 +102,47 @@ export async function deduplicateDatabase() {
   }
 }
 
+export async function applyDevelopmentIndexes() {
+  const isDevelopmentMode =
+    process.env.PIPELINE_DEV_SEED === 'true' ||
+    (process.env.NODE_ENV || 'development') !== 'production'
+
+  if (!isDevelopmentMode) return
+
+  const db = getDb()
+  const teamPowerByName = {
+    'McLaren Formula 1 Team': 95,
+    'Scuderia Ferrari': 92,
+    'Mercedes Formula 1 Team': 90,
+    'Red Bull Racing': 88,
+    'Williams Racing': 77,
+    'Aston Martin F1 Team': 74,
+    'RB F1 Team': 73,
+    'Audi Revolut F1 Team': 71,
+    'Alpine F1 Team': 69,
+    'Haas F1 Team': 66,
+    'Cadillac Formula 1 Team': 61,
+  }
+
+  for (const [teamName, powerIndex] of Object.entries(teamPowerByName)) {
+    await db.query(
+      'UPDATE scuderia SET indice_potenza = ? WHERE nome = ?',
+      [powerIndex, teamName]
+    )
+  }
+
+  const [circuits] = await db.query('SELECT id_circuito, nome, tipologia FROM circuito')
+  for (const circuit of circuits) {
+    const unpredictability = inferDevelopmentUnpredictability(circuit.nome, circuit.tipologia)
+    await db.query(
+      'UPDATE circuito SET indice_imprevedibilita = ? WHERE id_circuito = ?',
+      [unpredictability, circuit.id_circuito]
+    )
+  }
+
+  console.log('   [db] Seed sviluppo: indici scuderie e circuiti aggiornati')
+}
+
 // ============================================================
 // ensureAdminUser
 // Garantisce che esista sempre un utente admin/admin nel DB.
@@ -479,4 +520,26 @@ async function removeDuplicateChildRows({ db, table, idColumn, keyColumns }) {
   }
 
   return removed
+}
+
+function inferDevelopmentUnpredictability(name, type) {
+  const normalized = `${name || ''} ${type || ''}`.toLowerCase()
+
+  if (normalized.includes('monaco')) return 0.82
+  if (normalized.includes('baku')) return 0.74
+  if (normalized.includes('jeddah')) return 0.64
+  if (normalized.includes('marina bay') || normalized.includes('singapore')) return 0.7
+  if (normalized.includes('las vegas')) return 0.62
+  if (normalized.includes('miami')) return 0.58
+  if (normalized.includes('interlagos') || normalized.includes('josé carlos pace')) return 0.67
+  if (normalized.includes('spa')) return 0.56
+  if (normalized.includes('hungaroring')) return 0.45
+  if (normalized.includes('monza')) return 0.3
+  if (normalized.includes('suzuka')) return 0.28
+  if (normalized.includes('barcelona')) return 0.25
+  if (normalized.includes('zandvoort')) return 0.4
+  if (normalized.includes('misto')) return 0.42
+  if (normalized.includes('cittadino')) return 0.6
+
+  return 0.35
 }
