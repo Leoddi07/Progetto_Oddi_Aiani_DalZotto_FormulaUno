@@ -13,16 +13,15 @@ const router  = express.Router()
 const db      = require('../db')
 
 // GET /api/teams
-// Usa punti_totali dalla tabella scuderia
 router.get('/', async (req, res) => {
   try {
     const [rows] = await db.query(`
       SELECT
-        s.id_scuderia     AS id,
-        s.nome            AS name,
-        s.\`nazionalità_s\` AS nationality,
-        s.punti_totali    AS points,
-        s.indice_potenza  AS powerIndex
+        s.id_scuderia    AS id,
+        s.nome           AS name,
+        s.nazionalita    AS nationality,
+        s.punti_totali   AS points,
+        s.indice_potenza AS powerIndex
       FROM scuderia s
       ORDER BY s.punti_totali DESC
     `)

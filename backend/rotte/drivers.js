@@ -15,13 +15,12 @@ const db      = require('../db')
 // GET /api/drivers
 router.get('/', async (req, res) => {
   try {
-    // ehi chat puoi migliroarmi la query? 🥰❤️❤️
     const [rows] = await db.query(`
       SELECT
         p.id_pilota          AS id,
         p.nome               AS firstname,
         p.cognome            AS lastname,
-        p.nazionalità        AS nationality,
+        p.nazionalita        AS nationality,
         p.numero             AS number,
         s.nome               AS team,
         s.indice_potenza     AS teamPower,
@@ -29,14 +28,14 @@ router.get('/', async (req, res) => {
       FROM pilota p
       JOIN scuderia s  ON p.id_scuderia_FK = s.id_scuderia
       LEFT JOIN risultato r ON r.id_pilota_FK = p.id_pilota
-      GROUP BY p.id_pilota, p.nome, p.cognome, p.nazionalità,
+      GROUP BY p.id_pilota, p.nome, p.cognome, p.nazionalita,
                p.numero, s.nome, s.indice_potenza
       ORDER BY points DESC
     `)
     res.json(rows)
   } catch (err) {
     console.error('[drivers/GET]', err)
-    res.status(500).json({ error: 'Errore nel recupero dei piloti' })
+    res.status(500).json({ error: 'Errore nel recupero piloti' })
   }
 })
 
@@ -48,9 +47,9 @@ router.get('/:id', async (req, res) => {
         p.id_pilota,
         p.nome,
         p.cognome,
-        p.nazionalità,
+        p.nazionalita,
         p.numero,
-        s.nome          AS team,
+        s.nome           AS team,
         s.indice_potenza AS teamPower,
         COALESCE(SUM(r.punti_ottenuti), 0) AS points
       FROM pilota p

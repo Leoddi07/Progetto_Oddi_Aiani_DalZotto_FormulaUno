@@ -27,13 +27,13 @@ import {
   fetchDriversChampionship,
   fetchConstructorsChampionship,
   fetchNextRace,
-} from './scrapers/f1ApiScraper.js'
+} from './scraper/f1ApiScraper.js'
 import {
   cleanTeamsFromStandings,
   cleanDriversFromStandings,
   cleanRacesFromCurrent,
   buildWinnerResult,
-} from './cleaners/dataCleaner.js'
+} from './cleaner/dataCleaner.js'
 import {
   saveTeams,
   saveDrivers,
@@ -43,7 +43,7 @@ import {
   updateTeamPoints,
   ensureAdminUser,
   closeDb,
-} from './loaders/saveToDb.js'
+} from './loader/saveToDb.js'
 
 const args    = process.argv.slice(2)
 const onlyArg = args.find(a => a.startsWith('--only='))
