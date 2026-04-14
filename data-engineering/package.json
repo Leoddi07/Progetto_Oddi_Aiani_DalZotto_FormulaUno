@@ -5,14 +5,14 @@
   "main": "index.js",
   "type": "module",
   "scripts": {
-    "start": "node index.js",
-    "fetch-drivers": "node index.js --only=drivers",
-    "fetch-races":   "node index.js --only=races",
-    "fetch-all":     "node index.js"
+    "start":          "node index.js",
+    "fetch-drivers":  "node index.js --only=drivers",
+    "fetch-races":    "node index.js --only=races"
   },
   "dependencies": {
-    "mysql2": "^3.6.0",
-    "dotenv": "^16.3.1",
-    "node-fetch": "^3.3.2"
+    "mysql2":     "^3.6.0",
+    "dotenv":     "^16.3.1",
+    "node-fetch": "^3.3.2",
+    "bcrypt":     "^5.1.1"
   }
 }

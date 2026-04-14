@@ -1,110 +1,128 @@
 // ============================================================
-// data-engineering/index.js
+// data-engineering/index.js — Pipeline principale
 //
-// Entry point principale del modulo di data engineering.
-// Coordina: fetch → cleaning → inserimento nel DB
+// Flusso corretto per f1api.dev:
+//
+//   STANDINGS:
+//     /current/drivers-championship  → classifica + piloti + team
+//     /current/constructors-championship → classifica costruttori
+//
+//   GARE (NON esiste /api/{year}/races!):
+//     /current                       → tutte le gare + winner già incluso
+//     /current/next                  → prossima gara
+//
+//   RISULTATI:
+//     Il vincitore è già in /current (campo winner + teamWinner)
+//     Non esistono endpoint separati per risultati completi
 //
 // Uso:
-//   node index.js              → importa tutto
-//   node index.js --only=drivers  → solo piloti e scuderie
-//   node index.js --only=races    → solo gare e risultati
-//
-// Flusso:
-//   1. scraper/  → chiama F1api.dev e restituisce dati grezzi
-//   2. cleaner/  → pulisce e normalizza i dati
-//   3. loader/   → inserisce i dati nel database MySQL
-//
-//
-// si avvia con "node index.js" dalla cartella data-engineering
+//   node index.js                → importa tutto
+//   node index.js --only=drivers → solo piloti/scuderie da standings
+//   node index.js --only=races   → solo gare/circuiti + risultato vincitore
 // ============================================================
 
 import 'dotenv/config'
-import { fetchDriversAndTeams, fetchRaces, fetchRaceResults, fetchNextRace } from './scraper/f1ApiScraper.js'
-import { cleanDrivers, cleanTeams, cleanRaces, cleanRaceResults, cleanNextRace } from './cleaner/dataCleaner.js'
-import { saveTeams, saveDrivers, saveCircuits, saveRaces, saveRaceResults, closeDb } from './loader/saveToDb.js'
+import {
+  fetchCurrentSeason,
+  fetchDriversChampionship,
+  fetchConstructorsChampionship,
+  fetchNextRace,
+} from './scrapers/f1ApiScraper.js'
+import {
+  cleanTeamsFromStandings,
+  cleanDriversFromStandings,
+  cleanRacesFromCurrent,
+  buildWinnerResult,
+} from './cleaners/dataCleaner.js'
+import {
+  saveTeams,
+  saveDrivers,
+  saveCircuits,
+  saveRaces,
+  saveRaceResults,
+  updateTeamPoints,
+  ensureAdminUser,
+  closeDb,
+} from './loaders/saveToDb.js'
 
-// Argomento opzionale --only=drivers|races
-const args   = process.argv.slice(2)
+const args    = process.argv.slice(2)
 const onlyArg = args.find(a => a.startsWith('--only='))
-const only   = onlyArg ? onlyArg.split('=')[1] : 'all'
+const only    = onlyArg ? onlyArg.split('=')[1] : 'all'
 
-const SEASON = process.env.F1_SEASON || '2025'
-
-// ============================================================
-// Pipeline principale
-// ============================================================
 async function run() {
-  console.log('╔══════════════════════════════════════════╗')
-  console.log('║   FANalytics — Data Engineering Pipeline  ║')
-  console.log(`║   Stagione: ${SEASON}   Modalità: ${only.padEnd(10)}  ║`)
-  console.log('╚══════════════════════════════════════════╝\n')
+  console.log('╔══════════════════════════════════════════════╗')
+  console.log('║   FANalytics — Data Engineering Pipeline      ║')
+  console.log(`║   Modalità: ${only.padEnd(35)}║`)
+  console.log('║   ⚠️  indice_potenza / indice_imprevedibilita  ║')
+  console.log('║      NON vengono modificati (solo admin)       ║')
+  console.log('╚══════════════════════════════════════════════╝\n')
 
   try {
+    // ── Assicura sempre utente admin hardcoded ──────────────
+    console.log('🔑 Verifica utente admin...')
+    await ensureAdminUser()
+    console.log()
 
-    // ── FASE 1: Piloti e Scuderie ───────────────────────────
+    // ── FASE 1: Piloti e Scuderie da standings ──────────────
     if (only === 'all' || only === 'drivers') {
-      console.log('📡 [1/4] Fetch piloti e scuderie da F1api.dev...')
-      const rawDrivers = await fetchDriversAndTeams(SEASON)
+      console.log('📡 [1] Fetch classifica costruttori...')
+      const constructorStandings = await fetchConstructorsChampionship()
+      const teams = cleanTeamsFromStandings(constructorStandings)
+      await saveTeams(teams)
 
-      console.log('🧹 [2/4] Pulizia dati piloti e scuderie...')
-      const cleanedTeams   = cleanTeams(rawDrivers)
-      const cleanedDrivers = cleanDrivers(rawDrivers)
+      console.log('\n📡 [2] Fetch classifica piloti...')
+      const driverStandings = await fetchDriversChampionship()
+      const drivers = cleanDriversFromStandings(driverStandings)
+      await saveDrivers(drivers)
 
-      console.log(`💾 [3/4] Salvataggio ${cleanedTeams.length} scuderie e ${cleanedDrivers.length} piloti nel DB...`)
-      await saveTeams(cleanedTeams)
-      await saveDrivers(cleanedDrivers)
-      console.log('   ✅ Piloti e scuderie salvati\n')
+      console.log('   ✅ Piloti e scuderie OK\n')
     }
 
-    // ── FASE 2: Circuiti e Gare ─────────────────────────────
+    // ── FASE 2: Gare e circuiti da /current ─────────────────
     if (only === 'all' || only === 'races') {
-      console.log('📡 [1/3] Fetch calendario gare...')
-      const rawRaces = await fetchRaces(SEASON)
+      console.log('📡 [3] Fetch stagione corrente (tutte le gare)...')
+      const { season, races: rawRaces } = await fetchCurrentSeason()
+      console.log(`   Stagione: ${season}`)
 
-      console.log('🧹 [2/3] Pulizia dati gare e circuiti...')
-      const { circuits, races } = cleanRaces(rawRaces)
+      console.log('🧹 Pulizia gare e circuiti...')
+      const { circuits, races } = cleanRacesFromCurrent(rawRaces)
 
-      console.log(`💾 [3/3] Salvataggio ${circuits.length} circuiti e ${races.length} gare...`)
+      console.log('💾 Salvataggio circuiti...')
       await saveCircuits(circuits)
-      await saveRaces(races)
-      console.log('   ✅ Gare e circuiti salvati\n')
 
-      // ── FASE 3: Risultati gare già disputate ──────────────
-      console.log('📡 Fetch risultati e pit stop per ogni gara disputata...')
-      for (const race of races) {
-        if (!race.completed) continue  // salta gare future
+      console.log('💾 Salvataggio gare...')
+      const savedRaces = await saveRaces(races)
+
+      // ── FASE 3: Risultato vincitore (da /current) ──────────
+      // I dati winner/teamWinner sono già nella risposta /current
+      // Non servono endpoint aggiuntivi
+      console.log('\n💾 Salvataggio risultati vincitori...')
+      let savedWinners = 0
+      for (const race of savedRaces) {
+        if (!race.completed || !race.winner || !race.id_gara) continue
+        const result = buildWinnerResult(race)
+        if (!result) continue
         try {
-          process.stdout.write(`   → ${race.name} (round ${race.round})... `)
-          const rawResults  = await fetchRaceResults(SEASON, race.round)
-          const cleanResults = cleanRaceResults(rawResults, race.id_gara)
-          await saveRaceResults(cleanResults)
-          console.log('✅')
-          // Pausa tra le richieste per non sovraccaricare l'API
-          await sleep(300)
+          await saveRaceResults({ results: [result], pitStops: [] })
+          savedWinners++
         } catch (e) {
-          console.log(`⚠️  Skipped (${e.message})`)
+          console.warn(`   ⚠️  Winner non salvato per ${race.nome_gara_premio}: ${e.message}`)
         }
       }
-      console.log()
+      console.log(`   ✅ Vincitori salvati: ${savedWinners}`)
+
+      // Ricalcola punti_totali scuderie
+      console.log('\n💾 Ricalcolo punti_totali scuderie...')
+      await updateTeamPoints()
+      console.log('   ✅ Punti aggiornati\n')
     }
 
-    // ── FASE 4: Prossima gara ──────────────────────────────
-    if (only === 'all' || only === 'next') {
-      console.log('📡 Fetch prossima gara...')
-      const rawNext   = await fetchNextRace(SEASON)
-      if (rawNext) {
-        const cleaned = cleanNextRace(rawNext)
-        console.log(`   Prossima gara: ${cleaned.name} (${cleaned.date})`)
-      }
-      console.log()
-    }
-
-    console.log('════════════════════════════════════════════')
-    console.log('✅ Pipeline completata con successo!')
-    console.log('════════════════════════════════════════════')
+    console.log('════════════════════════════════════════════════')
+    console.log('✅ Pipeline completata!')
+    console.log('════════════════════════════════════════════════')
 
   } catch (err) {
-    console.error('\n❌ ERRORE PIPELINE:', err.message)
+    console.error('\n❌ ERRORE:', err.message)
     console.error(err.stack)
     process.exit(1)
   } finally {
@@ -112,9 +130,6 @@ async function run() {
   }
 }
 
-// Helper: aspetta N millisecondi (per rate limiting)
-function sleep(ms) {
-  return new Promise(resolve => setTimeout(resolve, ms))
-}
+function sleep(ms) { return new Promise(r => setTimeout(r, ms)) }
 
 run()

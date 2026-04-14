@@ -1,193 +1,199 @@
 // ============================================================
-// cleaners/dataCleaner.js — Pulizia e normalizzazione dati API
+// cleaners/dataCleaner.js — Pulizia dati API → formato DB
 //
-// Mappa i campi dell'API F1api.dev → nomi colonne del DB F1.sql:
+// Basato sulla struttura JSON REALE di f1api.dev (da /current):
 //
-//   scuderia:  nome, nazionalità_s, punti_totali
-//              (indice_potenza NON toccato — solo admin)
-//   pilota:    nome, cognome, nazionalità, numero, id_scuderia_FK
-//   circuito:  nome, paese, lunghezza_tracciato, tipologia
-//              (indice_imprevedibilità NON toccato — solo admin)
-//   gara:      nome_gara_premio, data, id_circuito_FK
+// race: {
+//   raceId, raceName, round, laps,
+//   schedule: { race: { date, time } },
+//   circuit:  { circuitId, circuitName, country, city,
+//               circuitLength, corners },
+//   winner:   { driverId, name, surname, number, shortName } | null,
+//   teamWinner: { teamId, teamName, country } | null,
+//   fast_lap: { fast_lap, fast_lap_driver_id, fast_lap_team_id }
+// }
+//
+// standings driver: {
+//   position, points, driverId,
+//   driver: { name, surname, nationality, number, shortName },
+//   team:   { teamId, teamName, country }
+// }
+//
+// Colonne DB (F1.sql definitivo):
+//   scuderia: nome, nazionalita, punti_totali
+//   pilota:   nome, cognome, nazionalita, numero, id_scuderia_FK
+//   circuito: nome, paese, lunghezza_tracciato, tipologia
+//   gara:     nome_gara_premio, data, id_circuito_FK
 //   risultato: posizione_arrivo, punti_ottenuti, giro_veloce,
 //              tempo_totale, id_pilota_FK, id_gara_FK
-//   pitstop:   numero_stop, tempo_pitstop, id_pilota_FK, id_gara_FK
+//   pitstop:  numero_stop, tempo_pitstop, id_pilota_FK, id_gara_FK
 // ============================================================
 
-// ---- cleanTeams ----
-export function cleanTeams(rawDrivers) {
-  if (!Array.isArray(rawDrivers)) return []
-  const teamsMap = new Map()
-
-  for (const driver of rawDrivers) {
-    const teamName = driver?.team?.name || driver?.constructor?.name
-                  || driver?.constructorName || driver?.team || null
-    const teamNat  = driver?.team?.nationality || driver?.constructor?.nationality
-                  || driver?.constructorNationality || null
-
-    if (!teamName || typeof teamName !== 'string') continue
-    const name = teamName.trim().replace(/\s+/g, ' ')
-
-    if (!teamsMap.has(name)) {
-      teamsMap.set(name, {
-        nome:        name,
-        nazionalita: cleanString(teamNat) || 'N/A',
-        punti_totali: 0,
-        // indice_potenza NON inserito — gestito dall'admin
-      })
-    }
-  }
-
-  const teams = Array.from(teamsMap.values())
-  console.log(`   [cleaner] Scuderie: ${teams.length}`)
-  return teams
-}
-
-// ---- cleanDrivers ----
-export function cleanDrivers(rawDrivers) {
-  if (!Array.isArray(rawDrivers)) return []
+// ============================================================
+// cleanTeamsFromStandings
+// Input: array standings costruttori da /constructors-championship
+// Output: array scuderie per il DB
+// ============================================================
+export function cleanTeamsFromStandings(standings) {
+  if (!Array.isArray(standings)) return []
   const cleaned = []
 
-  for (const driver of rawDrivers) {
-    const firstName = driver?.name     || driver?.givenName  || driver?.firstName || null
-    const lastName  = driver?.surname  || driver?.familyName || driver?.lastName  || null
-    const nat       = driver?.nationality || driver?.driverNationality            || null
-    const number    = driver?.number   || driver?.permanentNumber                 || null
-    const teamName  = driver?.team?.name || driver?.constructor?.name
-                   || driver?.constructorName                                     || null
+  for (const entry of standings) {
+    const team = entry?.team || entry
+    const nome = cleanString(team?.teamName || team?.name)
+    if (!nome) continue
 
-    if (!firstName || !lastName || !teamName) {
-      console.warn(`   [cleaner] Pilota saltato: ${JSON.stringify(driver).slice(0, 60)}`)
+    cleaned.push({
+      nome,
+      nazionalita:  cleanString(team?.country || team?.nationality) || 'N/A',
+      punti_totali: parseIntSafe(entry?.points) || 0,
+      // indice_potenza NON inserito — gestito dall'admin
+    })
+  }
+
+  console.log(`   [cleaner] Scuderie da standings: ${cleaned.length}`)
+  return cleaned
+}
+
+// ============================================================
+// cleanDriversFromStandings
+// Input: array standings piloti da /drivers-championship
+// Output: array piloti per il DB
+// ============================================================
+export function cleanDriversFromStandings(standings) {
+  if (!Array.isArray(standings)) return []
+  const cleaned = []
+
+  for (const entry of standings) {
+    const driver   = entry?.driver  || entry
+    const team     = entry?.team    || {}
+    const nome     = cleanString(driver?.name)
+    const cognome  = cleanString(driver?.surname)
+    const teamNome = cleanString(team?.teamName || team?.name)
+
+    if (!nome || !cognome || !teamNome) {
+      console.warn(`   [cleaner] Pilota saltato: ${JSON.stringify(entry).slice(0, 80)}`)
       continue
     }
 
     cleaned.push({
-      nome:       cleanString(firstName),
-      cognome:    cleanString(lastName),
-      nazionalita: cleanString(nat) || 'N/A',
-      numero:     parseIntSafe(number) || 99,
-      team_nome:  cleanString(teamName),  // per lookup id_scuderia_FK in saveToDb
+      nome,
+      cognome,
+      nazionalita: cleanString(driver?.nationality || driver?.country) || 'N/A',
+      numero:      parseIntSafe(driver?.number) || 99,
+      team_nome:   teamNome,  // usato per lookup id_scuderia_FK
     })
   }
 
-  console.log(`   [cleaner] Piloti: ${cleaned.length}/${rawDrivers.length}`)
+  console.log(`   [cleaner] Piloti da standings: ${cleaned.length}`)
   return cleaned
 }
 
-// ---- cleanRaces ----
-export function cleanRaces(rawRaces) {
+// ============================================================
+// cleanRacesFromCurrent
+// Input: array races da /current (struttura reale API)
+// Output: { circuits: [...], races: [...] }
+//
+// NOTA: winner e fast_lap sono già nella risposta /current,
+// quindi non servono endpoint separati per i risultati!
+// ============================================================
+export function cleanRacesFromCurrent(rawRaces) {
   if (!Array.isArray(rawRaces)) return { circuits: [], races: [] }
 
   const circuitsMap = new Map()
   const races       = []
 
   for (const race of rawRaces) {
-    const circuitName    = race?.circuit?.name    || race?.circuitName || null
-    const circuitCountry = race?.circuit?.country || race?.country     || null
-    const circuitLength  = race?.circuit?.length  || null
-    const raceName       = race?.raceName || race?.name || race?.grandPrix || null
-    const dateRaw        = race?.date     || race?.raceDate              || null
-    const round          = race?.round    || race?.roundNumber           || null
+    // ---- Dati circuito (da race.circuit) ----
+    const circ = race?.circuit || {}
+    const circNome = cleanString(circ.circuitName)
+    if (!circNome) { console.warn(`   [cleaner] Circuito mancante in race ${race.raceId}`); continue }
 
-    if (!raceName || !circuitName) { console.warn('   [cleaner] Gara saltata'); continue }
-
-    const date      = cleanDate(dateRaw)
-    const completed = date ? new Date(date) <= new Date() : false
-    const circKey   = cleanString(circuitName)
-
-    if (circKey && !circuitsMap.has(circKey)) {
-      circuitsMap.set(circKey, {
-        nome:                circKey,
-        paese:               cleanString(circuitCountry) || 'N/A',
-        lunghezza_tracciato: parseFloatSafe(circuitLength) || 0.00,
-        tipologia:           inferTipologia(circKey),
+    if (!circuitsMap.has(circNome)) {
+      // circuitLength arriva come stringa tipo "5278km" → togliamo "km"
+      const lunghezza = parseFloatSafe(
+        String(circ.circuitLength || '0').replace(/[^\d.]/g, '')
+      )
+      circuitsMap.set(circNome, {
+        nome:                circNome,
+        paese:               cleanString(circ.country) || 'N/A',
+        lunghezza_tracciato: lunghezza || 0.00,
+        tipologia:           inferTipologia(circNome, circ.city),
         // indice_imprevedibilita NON inserito — gestito dall'admin
       })
     }
 
+    // ---- Data gara (da race.schedule.race.date) ----
+    const dateRaw  = race?.schedule?.race?.date || null
+    const data     = cleanDate(dateRaw)
+    const completed = data ? new Date(data) <= new Date() : false
+
+    // ---- Nome gara (max VARCHAR(30)) ----
+    const nomeGara = cleanString(race.raceName)?.slice(0, 30) || `Round ${race.round}`
+
+    // ---- Winner (disponibile direttamente in /current) ----
+    const winner     = race?.winner     || null   // { name, surname, number, shortName } | null
+    const teamWinner = race?.teamWinner || null   // { teamId, teamName } | null
+    const fastLap    = race?.fast_lap?.fast_lap   || null
+
     races.push({
-      nome_gara_premio: cleanString(raceName)?.slice(0, 30),
-      data:             date,
-      circuito_nome:    circKey,
+      // Campi per DB
+      nome_gara_premio: nomeGara,
+      data,
+      circuito_nome:    circNome,
+      // Metadati (usati dopo per inserire risultato vincitore)
+      round:            parseIntSafe(race.round),
+      raceId:           race.raceId,
       completed,
-      round:            parseIntSafe(round),
+      laps:             parseIntSafe(race.laps),
+      winner,
+      teamWinner,
+      fastLap,
     })
   }
 
   const circuits = Array.from(circuitsMap.values())
-  console.log(`   [cleaner] Circuiti: ${circuits.length}, Gare: ${races.length}`)
+  console.log(`   [cleaner] Circuiti: ${circuits.length}, Gare: ${races.length} (${races.filter(r=>r.completed).length} disputate)`)
   return { circuits, races }
 }
 
-// ---- cleanRaceResults ----
-export function cleanRaceResults({ results, pitStops }, id_gara) {
-  const cleanedResults  = []
-  const cleanedPitStops = []
-
-  if (Array.isArray(results)) {
-    for (const r of results) {
-      const firstName = r?.driver?.name    || r?.givenName   || null
-      const lastName  = r?.driver?.surname || r?.familyName  || null
-      const number    = r?.driver?.number  || r?.permanentNumber || null
-      const position  = r?.position        || r?.finishPosition || null
-      const points    = r?.points          || r?.racePoints  || 0
-      const time      = r?.time?.time      || r?.totalRaceTime  || null
-      const fastest   = r?.fastestLap?.rank === 1 || r?.fastestLap === true || false
-
-      if (position === null) continue
-
-      cleanedResults.push({
-        pilota_nome:      cleanString(firstName),
-        pilota_cognome:   cleanString(lastName),
-        pilota_numero:    parseIntSafe(number),
-        id_gara,
-        posizione_arrivo: parseIntSafe(position),
-        punti_ottenuti:   Math.round(parseFloatSafe(points) || 0),
-        giro_veloce:      fastest ? 1 : 0,
-        tempo_totale:     (cleanString(time) || 'N/A').slice(0, 15),
-      })
-    }
+// ============================================================
+// cleanNextRace
+// Input: singolo oggetto race da /current/next
+// ============================================================
+export function cleanNextRace(rawRace) {
+  if (!rawRace) return null
+  return {
+    nome_gara_premio: (cleanString(rawRace.raceName) || 'Prossima Gara').slice(0, 30),
+    data:             cleanDate(rawRace?.schedule?.race?.date),
+    circuito_nome:    cleanString(rawRace?.circuit?.circuitName),
+    paese:            cleanString(rawRace?.circuit?.country),
+    round:            parseIntSafe(rawRace.round),
   }
-
-  if (Array.isArray(pitStops)) {
-    for (const ps of pitStops) {
-      const firstName = ps?.driver?.name    || ps?.givenName  || null
-      const lastName  = ps?.driver?.surname || ps?.familyName || null
-      const number    = ps?.driver?.number  || ps?.permanentNumber || null
-      const stop      = ps?.stop            || ps?.stopNumber  || 1
-      const duration  = ps?.duration        || ps?.pitStopTime || null
-
-      if (!duration) continue
-      const sec = parsePitStopTime(duration)
-      if (!sec) continue
-
-      cleanedPitStops.push({
-        pilota_nome:    cleanString(firstName),
-        pilota_cognome: cleanString(lastName),
-        pilota_numero:  parseIntSafe(number),
-        id_gara,
-        numero_stop:    parseIntSafe(stop) || 1,
-        tempo_pitstop:  sec,
-      })
-    }
-  }
-
-  return { results: cleanedResults, pitStops: cleanedPitStops }
 }
 
-// ---- cleanNextRace ----
-export function cleanNextRace(rawNext) {
-  if (!rawNext) return null
+// ============================================================
+// buildWinnerResult
+// Costruisce un record `risultato` dal winner già disponibile
+// in /current — evita la necessità di endpoint separati
+// ============================================================
+export function buildWinnerResult(race) {
+  if (!race.completed || !race.winner || !race.id_gara) return null
+
   return {
-    nome_gara_premio: (cleanString(rawNext?.raceName || rawNext?.name) || 'Prossima Gara').slice(0, 30),
-    data:             cleanDate(rawNext?.date || rawNext?.raceDate),
-    circuito_nome:    cleanString(rawNext?.circuit?.name || rawNext?.circuitName),
-    paese:            cleanString(rawNext?.circuit?.country || rawNext?.country),
-    round:            parseIntSafe(rawNext?.round || rawNext?.roundNumber),
+    pilota_nome:      cleanString(race.winner.name),
+    pilota_cognome:   cleanString(race.winner.surname),
+    pilota_numero:    parseIntSafe(race.winner.number),
+    id_gara:          race.id_gara,
+    posizione_arrivo: 1,
+    punti_ottenuti:   25,        // il vincitore prende 25 punti
+    giro_veloce:      race.fastLap ? 1 : 0,
+    tempo_totale:     'winner',  // non disponibile da /current
   }
 }
 
 // ---- Utility ----
+
 function cleanString(val) {
   if (val == null) return null
   return String(val).trim().replace(/\s+/g, ' ') || null
@@ -206,19 +212,13 @@ function cleanDate(val) {
     return d.toISOString().slice(0, 10)
   } catch { return null }
 }
-function parsePitStopTime(val) {
-  if (!val) return null
-  const str = String(val).trim()
-  if (/^\d+\.\d+$/.test(str)) return parseFloatSafe(str)
-  const match = str.match(/^(\d+):(\d+)\.(\d+)$/)
-  if (match) return parseInt(match[1]) * 60 + parseInt(match[2]) + parseFloat(`0.${match[3]}`)
-  return parseFloatSafe(str)
-}
-function inferTipologia(name) {
-  const n = name.toLowerCase()
+function inferTipologia(name, city) {
+  const n = (name + ' ' + (city || '')).toLowerCase()
   if (n.includes('monaco') || n.includes('baku') || n.includes('jeddah')
-      || n.includes('singapore') || n.includes('street') || n.includes('vegas')
-      || n.includes('miami') || n.includes('city')) return 'cittadino'
+      || n.includes('singapore') || n.includes('marina bay') || n.includes('las vegas')
+      || n.includes('miami') || n.includes('street') || n.includes('city circuit')) {
+    return 'cittadino'
+  }
   if (n.includes('albert park') || n.includes('zandvoort')) return 'misto'
   return 'permanente'
 }
