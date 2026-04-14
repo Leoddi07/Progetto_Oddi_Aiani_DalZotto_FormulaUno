@@ -1,14 +1,14 @@
 // src/pages/LoginPage.jsx
 //
-// Pagina di login — Prima cosa che vede l'utente.
+// Pagina di login - Prima cosa che vede l'utente.
 // Layout: sidebar sinistra con logo/menu + form login a destra
-
 
 import React, { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useAuth } from '../context/AuthContext.jsx'
 
-// Schermata di registrazione (mostrata quando l'utente clicca "Crea account")
+const CURRENT_SEASON = new Date().getFullYear()
+
 function RegisterForm({ onBack }) {
   const { register } = useAuth()
   const [form, setForm] = useState({ username: '', email: '', password: '' })
@@ -65,7 +65,7 @@ function RegisterForm({ onBack }) {
         <input
           className="input-dark"
           type="password"
-          placeholder="••••••••"
+          placeholder="........"
           value={form.password}
           onChange={e => setForm(f => ({ ...f, password: e.target.value }))}
         />
@@ -80,15 +80,14 @@ function RegisterForm({ onBack }) {
   )
 }
 
-// Componente principale pagina login
 export default function LoginPage() {
   const { login } = useAuth()
   const navigate = useNavigate()
 
   const [showRegister, setShowRegister] = useState(false)
-  const [form, setForm]     = useState({ username: '', password: '' })
+  const [form, setForm] = useState({ username: '', password: '' })
   const [loading, setLoading] = useState(false)
-  const [error, setError]   = useState('')
+  const [error, setError] = useState('')
 
   async function handleLogin(e) {
     e.preventDefault()
@@ -110,9 +109,7 @@ export default function LoginPage() {
 
   return (
     <div style={styles.page}>
-      {/* Sidebar sinistra con logo e menu */}
       <div style={styles.leftPanel}>
-        {/* Logo */}
         <div style={styles.logo}>
           <span style={styles.logoIcon}>▶</span>
           <div>
@@ -121,7 +118,6 @@ export default function LoginPage() {
           </div>
         </div>
 
-        {/* Menu items (solo decorativi nel login) */}
         <nav style={styles.fakeNav}>
           {['Classifiche Piloti & Costruttori', 'Analisi Gare e Pit Stop', 'Previsione Risultati'].map(item => (
             <div key={item} style={styles.fakeNavItem}>
@@ -131,14 +127,12 @@ export default function LoginPage() {
           ))}
         </nav>
 
-        {/* Credits in basso */}
         <div style={styles.leftBottom}>
-          <div style={{ color: '#555', fontSize: 12 }}>FANalytics · Stagione 2025</div>
+          <div style={{ color: '#555', fontSize: 12 }}>{`FANalytics · Stagione ${CURRENT_SEASON}`}</div>
           <div style={{ color: '#444', fontSize: 11 }}>Dati: F1api.dev</div>
         </div>
       </div>
 
-      {/* Pannello destro con form */}
       <div style={styles.rightPanel}>
         {showRegister ? (
           <RegisterForm onBack={() => setShowRegister(false)} />
@@ -166,18 +160,17 @@ export default function LoginPage() {
               <input
                 className="input-dark"
                 type="password"
-                placeholder="••••••••"
+                placeholder="........"
                 value={form.password}
                 onChange={e => setForm(f => ({ ...f, password: e.target.value }))}
                 onKeyDown={e => e.key === 'Enter' && handleLogin(e)}
               />
             </div>
 
-            {/* Link password dimenticata*/}
             <div style={{ textAlign: 'right', marginBottom: 20 }}>
               <span
                 style={{ color: '#e10600', fontSize: 13, cursor: 'pointer', fontWeight: 600 }}
-                onClick={() => alert('Funzione "password dimenticata" — da implementare nel backend')}
+                onClick={() => alert('Funzione "password dimenticata" - da implementare nel backend')}
               >
                 Password dimenticata?
               </span>
@@ -205,7 +198,6 @@ const styles = {
     minHeight: '100vh',
     background: '#0f0f0f',
   },
-  // --- Pannello sinistro ---
   leftPanel: {
     width: 320,
     minWidth: 280,
@@ -225,7 +217,7 @@ const styles = {
   },
   logoIcon: { color: '#e10600', fontSize: 28, lineHeight: 1 },
   logoTitle: { fontSize: 26, fontWeight: 900, color: '#fff', letterSpacing: -0.5 },
-  logoSub:   { fontSize: 12, color: '#a0a0a0', marginTop: 2 },
+  logoSub: { fontSize: 12, color: '#a0a0a0', marginTop: 2 },
   fakeNav: {
     padding: '0 24px',
     display: 'flex',
@@ -252,7 +244,6 @@ const styles = {
     padding: '24px',
     borderTop: '1px solid #2a2a2a',
   },
-  // --- Pannello destro ---
   rightPanel: {
     flex: 1,
     display: 'flex',
@@ -285,7 +276,5 @@ const styles = {
     margin: '20px 0',
     color: '#555',
     fontSize: 13,
-    '::before': { content: '""', flex: 1, height: 1, background: '#2a2a2a' },
-    '::after':  { content: '""', flex: 1, height: 1, background: '#2a2a2a' },
   },
 }

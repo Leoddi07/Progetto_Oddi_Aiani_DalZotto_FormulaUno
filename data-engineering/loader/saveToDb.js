@@ -37,6 +37,71 @@ export async function closeDb() {
   if (pool) { await pool.end(); console.log('   [db] Connessione chiusa') }
 }
 
+export async function deduplicateDatabase() {
+  const db = getDb()
+
+  const teamsMerged = await mergeDuplicateGroups({
+    db,
+    table: 'scuderia',
+    idColumn: 'id_scuderia',
+    keyColumns: ['nome'],
+    childUpdates: [
+      { table: 'pilota', fk: 'id_scuderia_FK' },
+    ],
+  })
+
+  const circuitsMerged = await mergeDuplicateGroups({
+    db,
+    table: 'circuito',
+    idColumn: 'id_circuito',
+    keyColumns: ['nome'],
+    childUpdates: [
+      { table: 'gara', fk: 'id_circuito_FK' },
+    ],
+  })
+
+  const racesMerged = await mergeDuplicateGroups({
+    db,
+    table: 'gara',
+    idColumn: 'id_gara',
+    keyColumns: ['nome_gara_premio', 'data'],
+    childUpdates: [
+      { table: 'risultato', fk: 'id_gara_FK' },
+      { table: 'pitstop', fk: 'id_gara_FK' },
+    ],
+  })
+
+  const driversMerged = await mergeDuplicateGroups({
+    db,
+    table: 'pilota',
+    idColumn: 'id_pilota',
+    keyColumns: ['numero'],
+    childUpdates: [
+      { table: 'risultato', fk: 'id_pilota_FK' },
+      { table: 'pitstop', fk: 'id_pilota_FK' },
+    ],
+  })
+
+  const resultsMerged = await removeDuplicateChildRows({
+    db,
+    table: 'risultato',
+    idColumn: 'id_risultato',
+    keyColumns: ['id_pilota_FK', 'id_gara_FK', 'posizione_arrivo'],
+  })
+
+  const pitstopsMerged = await removeDuplicateChildRows({
+    db,
+    table: 'pitstop',
+    idColumn: 'id_pitstop',
+    keyColumns: ['id_pilota_FK', 'id_gara_FK', 'numero_stop'],
+  })
+
+  const totalMerged = teamsMerged + circuitsMerged + racesMerged + driversMerged + resultsMerged + pitstopsMerged
+  if (totalMerged > 0) {
+    console.log(`   [db] Deduplica completata: ${totalMerged} record duplicati consolidati`)
+  }
+}
+
 // ============================================================
 // ensureAdminUser
 // Garantisce che esista sempre un utente admin/admin nel DB.
@@ -81,13 +146,23 @@ export async function saveTeams(teams) {
   let saved = 0
 
   for (const team of teams) {
-    await db.query(`
-      INSERT INTO scuderia (nome, nazionalita, punti_totali)
-      VALUES (?, ?, ?)
-      ON DUPLICATE KEY UPDATE
-        nazionalita   = VALUES(nazionalita),
-        punti_totali  = VALUES(punti_totali)
-    `, [team.nome, team.nazionalita, team.punti_totali || 0])
+    const [existing] = await db.query(
+      'SELECT id_scuderia FROM scuderia WHERE nome = ? LIMIT 1',
+      [team.nome]
+    )
+
+    if (existing.length) {
+      await db.query(`
+        UPDATE scuderia
+        SET nazionalita = ?, punti_totali = ?
+        WHERE id_scuderia = ?
+      `, [team.nazionalita, team.punti_totali || 0, existing[0].id_scuderia])
+    } else {
+      await db.query(`
+        INSERT INTO scuderia (nome, nazionalita, punti_totali)
+        VALUES (?, ?, ?)
+      `, [team.nome, team.nazionalita, team.punti_totali || 0])
+    }
     saved++
   }
   console.log(`   [db] Scuderie: ${saved}`)
@@ -112,16 +187,26 @@ export async function saveDrivers(drivers) {
       continue
     }
 
-    await db.query(`
-      INSERT INTO pilota (nome, cognome, nazionalita, numero, id_scuderia_FK)
-      VALUES (?, ?, ?, ?, ?)
-      ON DUPLICATE KEY UPDATE
-        nome           = VALUES(nome),
-        cognome        = VALUES(cognome),
-        nazionalita    = VALUES(nazionalita),
-        numero         = VALUES(numero),
-        id_scuderia_FK = VALUES(id_scuderia_FK)
-    `, [driver.nome, driver.cognome, driver.nazionalita, driver.numero, teams[0].id_scuderia])
+    const [existing] = await db.query(`
+      SELECT id_pilota
+      FROM pilota
+      WHERE numero = ? OR (nome = ? AND cognome = ?)
+      ORDER BY id_pilota ASC
+      LIMIT 1
+    `, [driver.numero, driver.nome, driver.cognome])
+
+    if (existing.length) {
+      await db.query(`
+        UPDATE pilota
+        SET nome = ?, cognome = ?, nazionalita = ?, numero = ?, id_scuderia_FK = ?
+        WHERE id_pilota = ?
+      `, [driver.nome, driver.cognome, driver.nazionalita, driver.numero, teams[0].id_scuderia, existing[0].id_pilota])
+    } else {
+      await db.query(`
+        INSERT INTO pilota (nome, cognome, nazionalita, numero, id_scuderia_FK)
+        VALUES (?, ?, ?, ?, ?)
+      `, [driver.nome, driver.cognome, driver.nazionalita, driver.numero, teams[0].id_scuderia])
+    }
     saved++
   }
   console.log(`   [db] Piloti: ${saved} OK, ${skipped} saltati`)
@@ -136,14 +221,23 @@ export async function saveCircuits(circuits) {
   let saved = 0
 
   for (const c of circuits) {
-    await db.query(`
-      INSERT INTO circuito (nome, paese, lunghezza_tracciato, tipologia)
-      VALUES (?, ?, ?, ?)
-      ON DUPLICATE KEY UPDATE
-        paese               = VALUES(paese),
-        lunghezza_tracciato = VALUES(lunghezza_tracciato),
-        tipologia           = VALUES(tipologia)
-    `, [c.nome, c.paese, c.lunghezza_tracciato || 0.00, c.tipologia])
+    const [existing] = await db.query(
+      'SELECT id_circuito FROM circuito WHERE nome = ? LIMIT 1',
+      [c.nome]
+    )
+
+    if (existing.length) {
+      await db.query(`
+        UPDATE circuito
+        SET paese = ?, lunghezza_tracciato = ?, tipologia = ?
+        WHERE id_circuito = ?
+      `, [c.paese, c.lunghezza_tracciato || 0.00, c.tipologia, existing[0].id_circuito])
+    } else {
+      await db.query(`
+        INSERT INTO circuito (nome, paese, lunghezza_tracciato, tipologia)
+        VALUES (?, ?, ?, ?)
+      `, [c.nome, c.paese, c.lunghezza_tracciato || 0.00, c.tipologia])
+    }
     saved++
   }
   console.log(`   [db] Circuiti: ${saved}`)
@@ -174,17 +268,27 @@ export async function saveRaces(races) {
       continue
     }
 
-    await db.query(`
-      INSERT INTO gara (nome_gara_premio, data, id_circuito_FK)
-      VALUES (?, ?, ?)
-      ON DUPLICATE KEY UPDATE
-        nome_gara_premio = VALUES(nome_gara_premio),
-        data             = VALUES(data)
-    `, [race.nome_gara_premio, race.data, circuits[0].id_circuito])
+    const [existing] = await db.query(
+      'SELECT id_gara FROM gara WHERE nome_gara_premio = ? AND data = ? ORDER BY id_gara ASC LIMIT 1',
+      [race.nome_gara_premio, race.data]
+    )
+
+    if (existing.length) {
+      await db.query(`
+        UPDATE gara
+        SET nome_gara_premio = ?, data = ?, id_circuito_FK = ?
+        WHERE id_gara = ?
+      `, [race.nome_gara_premio, race.data, circuits[0].id_circuito, existing[0].id_gara])
+    } else {
+      await db.query(`
+        INSERT INTO gara (nome_gara_premio, data, id_circuito_FK)
+        VALUES (?, ?, ?)
+      `, [race.nome_gara_premio, race.data, circuits[0].id_circuito])
+    }
 
     // Recupera id_gara per poterlo usare nei risultati
     const [inserted] = await db.query(
-      'SELECT id_gara FROM gara WHERE nome_gara_premio = ? AND data = ?',
+      'SELECT id_gara FROM gara WHERE nome_gara_premio = ? AND data = ? ORDER BY id_gara ASC LIMIT 1',
       [race.nome_gara_premio, race.data]
     )
     if (inserted.length) race.id_gara = inserted[0].id_gara
@@ -226,29 +330,54 @@ export async function saveRaceResults({ results, pitStops }) {
       console.warn(`   [db] Pilota non trovato: ${r.pilota_nome} ${r.pilota_cognome} #${r.pilota_numero}`)
       continue
     }
-    await db.query(`
-      INSERT INTO risultato
-        (posizione_arrivo, punti_ottenuti, giro_veloce, tempo_totale,
-         id_pilota_FK, id_gara_FK)
-      VALUES (?, ?, ?, ?, ?, ?)
-      ON DUPLICATE KEY UPDATE
-        posizione_arrivo = VALUES(posizione_arrivo),
-        punti_ottenuti   = VALUES(punti_ottenuti),
-        giro_veloce      = VALUES(giro_veloce),
-        tempo_totale     = VALUES(tempo_totale)
-    `, [r.posizione_arrivo, r.punti_ottenuti, r.giro_veloce,
-        r.tempo_totale, id_pilota, r.id_gara])
+    const [existing] = await db.query(`
+      SELECT id_risultato
+      FROM risultato
+      WHERE id_pilota_FK = ? AND id_gara_FK = ? AND posizione_arrivo = ?
+      ORDER BY id_risultato ASC
+      LIMIT 1
+    `, [id_pilota, r.id_gara, r.posizione_arrivo])
+
+    if (existing.length) {
+      await db.query(`
+        UPDATE risultato
+        SET punti_ottenuti = ?, giro_veloce = ?, tempo_totale = ?
+        WHERE id_risultato = ?
+      `, [r.punti_ottenuti, r.giro_veloce, r.tempo_totale, existing[0].id_risultato])
+    } else {
+      await db.query(`
+        INSERT INTO risultato
+          (posizione_arrivo, punti_ottenuti, giro_veloce, tempo_totale,
+           id_pilota_FK, id_gara_FK)
+        VALUES (?, ?, ?, ?, ?, ?)
+      `, [r.posizione_arrivo, r.punti_ottenuti, r.giro_veloce,
+          r.tempo_totale, id_pilota, r.id_gara])
+    }
     savedRes++
   }
 
   for (const ps of pitStops) {
     const id_pilota = await findPilota(ps)
     if (!id_pilota) continue
-    await db.query(`
-      INSERT INTO pitstop (numero_stop, tempo_pitstop, id_pilota_FK, id_gara_FK)
-      VALUES (?, ?, ?, ?)
-      ON DUPLICATE KEY UPDATE tempo_pitstop = VALUES(tempo_pitstop)
-    `, [ps.numero_stop, ps.tempo_pitstop, id_pilota, ps.id_gara])
+    const [existing] = await db.query(`
+      SELECT id_pitstop
+      FROM pitstop
+      WHERE numero_stop = ? AND id_pilota_FK = ? AND id_gara_FK = ?
+      ORDER BY id_pitstop ASC
+      LIMIT 1
+    `, [ps.numero_stop, id_pilota, ps.id_gara])
+
+    if (existing.length) {
+      await db.query(
+        'UPDATE pitstop SET tempo_pitstop = ? WHERE id_pitstop = ?',
+        [ps.tempo_pitstop, existing[0].id_pitstop]
+      )
+    } else {
+      await db.query(`
+        INSERT INTO pitstop (numero_stop, tempo_pitstop, id_pilota_FK, id_gara_FK)
+        VALUES (?, ?, ?, ?)
+      `, [ps.numero_stop, ps.tempo_pitstop, id_pilota, ps.id_gara])
+    }
     savedPit++
   }
 
@@ -272,4 +401,82 @@ export async function updateTeamPoints() {
     )
   `)
   console.log('   [db] punti_totali aggiornati')
+}
+
+async function mergeDuplicateGroups({ db, table, idColumn, keyColumns, childUpdates = [] }) {
+  const keySelect = keyColumns.map(c => `\`${c}\``).join(', ')
+  const [groups] = await db.query(`
+    SELECT ${keySelect}, MIN(\`${idColumn}\`) AS keep_id, COUNT(*) AS duplicate_count
+    FROM \`${table}\`
+    GROUP BY ${keySelect}
+    HAVING COUNT(*) > 1
+  `)
+
+  let merged = 0
+
+  for (const group of groups) {
+    const whereClause = keyColumns.map(c => `\`${c}\` <=> ?`).join(' AND ')
+    const whereValues = keyColumns.map(c => group[c])
+    const [rows] = await db.query(`
+      SELECT \`${idColumn}\`
+      FROM \`${table}\`
+      WHERE ${whereClause}
+      ORDER BY \`${idColumn}\` ASC
+    `, whereValues)
+
+    const duplicateIds = rows.map(r => r[idColumn]).filter(id => id !== group.keep_id)
+    if (!duplicateIds.length) continue
+
+    for (const child of childUpdates) {
+      await db.query(`
+        UPDATE \`${child.table}\`
+        SET \`${child.fk}\` = ?
+        WHERE \`${child.fk}\` IN (${duplicateIds.map(() => '?').join(', ')})
+      `, [group.keep_id, ...duplicateIds])
+    }
+
+    await db.query(`
+      DELETE FROM \`${table}\`
+      WHERE \`${idColumn}\` IN (${duplicateIds.map(() => '?').join(', ')})
+    `, duplicateIds)
+
+    merged += duplicateIds.length
+  }
+
+  return merged
+}
+
+async function removeDuplicateChildRows({ db, table, idColumn, keyColumns }) {
+  const keySelect = keyColumns.map(c => `\`${c}\``).join(', ')
+  const [groups] = await db.query(`
+    SELECT ${keySelect}, MIN(\`${idColumn}\`) AS keep_id, COUNT(*) AS duplicate_count
+    FROM \`${table}\`
+    GROUP BY ${keySelect}
+    HAVING COUNT(*) > 1
+  `)
+
+  let removed = 0
+
+  for (const group of groups) {
+    const whereClause = keyColumns.map(c => `\`${c}\` <=> ?`).join(' AND ')
+    const whereValues = keyColumns.map(c => group[c])
+    const [rows] = await db.query(`
+      SELECT \`${idColumn}\`
+      FROM \`${table}\`
+      WHERE ${whereClause}
+      ORDER BY \`${idColumn}\` ASC
+    `, whereValues)
+
+    const duplicateIds = rows.map(r => r[idColumn]).filter(id => id !== group.keep_id)
+    if (!duplicateIds.length) continue
+
+    await db.query(`
+      DELETE FROM \`${table}\`
+      WHERE \`${idColumn}\` IN (${duplicateIds.map(() => '?').join(', ')})
+    `, duplicateIds)
+
+    removed += duplicateIds.length
+  }
+
+  return removed
 }

@@ -40,12 +40,12 @@ export function cleanTeamsFromStandings(standings) {
 
   for (const entry of standings) {
     const team = entry?.team || entry
-    const nome = cleanString(team?.teamName || team?.name)
+    const nome = cleanDbString(team?.teamName || team?.name, 30)
     if (!nome) continue
 
     cleaned.push({
       nome,
-      nazionalita:  cleanString(team?.country || team?.nationality) || 'N/A',
+      nazionalita:  cleanDbString(team?.country || team?.nationality, 20) || 'N/A',
       punti_totali: parseIntSafe(entry?.points) || 0,
       // indice_potenza NON inserito — gestito dall'admin
     })
@@ -67,9 +67,9 @@ export function cleanDriversFromStandings(standings) {
   for (const entry of standings) {
     const driver   = entry?.driver  || entry
     const team     = entry?.team    || {}
-    const nome     = cleanString(driver?.name)
-    const cognome  = cleanString(driver?.surname)
-    const teamNome = cleanString(team?.teamName || team?.name)
+    const nome     = cleanDbString(driver?.name, 20)
+    const cognome  = cleanDbString(driver?.surname, 30)
+    const teamNome = cleanDbString(team?.teamName || team?.name, 30)
 
     if (!nome || !cognome || !teamNome) {
       console.warn(`   [cleaner] Pilota saltato: ${JSON.stringify(entry).slice(0, 80)}`)
@@ -79,7 +79,7 @@ export function cleanDriversFromStandings(standings) {
     cleaned.push({
       nome,
       cognome,
-      nazionalita: cleanString(driver?.nationality || driver?.country) || 'N/A',
+      nazionalita: cleanDbString(driver?.nationality || driver?.country, 20) || 'N/A',
       numero:      parseIntSafe(driver?.number) || 99,
       team_nome:   teamNome,  // usato per lookup id_scuderia_FK
     })
@@ -106,7 +106,7 @@ export function cleanRacesFromCurrent(rawRaces) {
   for (const race of rawRaces) {
     // ---- Dati circuito (da race.circuit) ----
     const circ = race?.circuit || {}
-    const circNome = cleanString(circ.circuitName)
+    const circNome = cleanDbString(circ.circuitName, 30)
     if (!circNome) { console.warn(`   [cleaner] Circuito mancante in race ${race.raceId}`); continue }
 
     if (!circuitsMap.has(circNome)) {
@@ -116,7 +116,7 @@ export function cleanRacesFromCurrent(rawRaces) {
       )
       circuitsMap.set(circNome, {
         nome:                circNome,
-        paese:               cleanString(circ.country) || 'N/A',
+        paese:               cleanDbString(circ.country, 30) || 'N/A',
         lunghezza_tracciato: lunghezza || 0.00,
         tipologia:           inferTipologia(circNome, circ.city),
         // indice_imprevedibilita NON inserito — gestito dall'admin
@@ -129,7 +129,7 @@ export function cleanRacesFromCurrent(rawRaces) {
     const completed = data ? new Date(data) <= new Date() : false
 
     // ---- Nome gara (max VARCHAR(30)) ----
-    const nomeGara = cleanString(race.raceName)?.slice(0, 30) || `Round ${race.round}`
+    const nomeGara = cleanDbString(race.raceName, 30) || `Round ${race.round}`
 
     // ---- Winner (disponibile direttamente in /current) ----
     const winner     = race?.winner     || null   // { name, surname, number, shortName } | null
@@ -164,10 +164,10 @@ export function cleanRacesFromCurrent(rawRaces) {
 export function cleanNextRace(rawRace) {
   if (!rawRace) return null
   return {
-    nome_gara_premio: (cleanString(rawRace.raceName) || 'Prossima Gara').slice(0, 30),
+    nome_gara_premio: cleanDbString(rawRace.raceName, 30) || 'Prossima Gara',
     data:             cleanDate(rawRace?.schedule?.race?.date),
-    circuito_nome:    cleanString(rawRace?.circuit?.circuitName),
-    paese:            cleanString(rawRace?.circuit?.country),
+    circuito_nome:    cleanDbString(rawRace?.circuit?.circuitName, 30),
+    paese:            cleanDbString(rawRace?.circuit?.country, 30),
     round:            parseIntSafe(rawRace.round),
   }
 }
@@ -181,8 +181,8 @@ export function buildWinnerResult(race) {
   if (!race.completed || !race.winner || !race.id_gara) return null
 
   return {
-    pilota_nome:      cleanString(race.winner.name),
-    pilota_cognome:   cleanString(race.winner.surname),
+    pilota_nome:      cleanDbString(race.winner.name, 20),
+    pilota_cognome:   cleanDbString(race.winner.surname, 30),
     pilota_numero:    parseIntSafe(race.winner.number),
     id_gara:          race.id_gara,
     posizione_arrivo: 1,
@@ -197,6 +197,11 @@ export function buildWinnerResult(race) {
 function cleanString(val) {
   if (val == null) return null
   return String(val).trim().replace(/\s+/g, ' ') || null
+}
+function cleanDbString(val, maxLen) {
+  const cleaned = cleanString(val)
+  if (!cleaned) return null
+  return maxLen ? cleaned.slice(0, maxLen) : cleaned
 }
 function parseIntSafe(val) {
   const n = parseInt(val, 10); return isNaN(n) ? null : n

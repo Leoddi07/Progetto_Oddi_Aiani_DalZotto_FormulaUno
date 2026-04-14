@@ -63,11 +63,12 @@ async function apiFetch(endpoint, retries = 3) {
 export async function fetchCurrentSeason() {
   // Prima chiamata per sapere il totale
   const first = await apiFetch('/current?limit=30&offset=0')
-  if (!first || !Array.isArray(first.races)) {
+  const firstPageRaces = first?.races || first?.race || []
+  if (!first || !Array.isArray(firstPageRaces)) {
     throw new Error('Risposta inattesa da /current')
   }
 
-  let races = [...first.races]
+  let races = [...firstPageRaces]
   const total = first.total || races.length
 
   // Paginazione: se ci sono più di 30 gare, fetch pagine successive
@@ -75,8 +76,9 @@ export async function fetchCurrentSeason() {
     let offset = 30
     while (offset < total) {
       const page = await apiFetch(`/current?limit=30&offset=${offset}`)
-      if (!page?.races?.length) break
-      races = races.concat(page.races)
+      const pageRaces = page?.races || page?.race || []
+      if (!pageRaces.length) break
+      races = races.concat(pageRaces)
       offset += 30
     }
   }
@@ -95,7 +97,11 @@ export async function fetchCurrentSeason() {
 // ============================================================
 export async function fetchDriversChampionship() {
   const data = await apiFetch('/current/drivers-championship')
-  const standings = data?.standings || data?.driverStandings || []
+  const standings =
+    data?.standings ||
+    data?.driverStandings ||
+    data?.drivers_championship ||
+    []
   if (!Array.isArray(standings)) {
     throw new Error('Risposta inattesa da /drivers-championship')
   }
@@ -112,7 +118,11 @@ export async function fetchDriversChampionship() {
 // ============================================================
 export async function fetchConstructorsChampionship() {
   const data = await apiFetch('/current/constructors-championship')
-  const standings = data?.standings || data?.constructorStandings || []
+  const standings =
+    data?.standings ||
+    data?.constructorStandings ||
+    data?.constructors_championship ||
+    []
   if (!Array.isArray(standings)) {
     throw new Error('Risposta inattesa da /constructors-championship')
   }

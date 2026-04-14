@@ -43,7 +43,7 @@ export async function getRaces() {
 // ENDPOINT: Risultati di una gara specifica
 // Backend: GET /api/results/:raceId
 export async function getRaceResults(raceId) {
-  return get(`/results/${raceId}`)
+  return get(`/races/results/${raceId}`)
 }
 
 // ENDPOINT: Prossima Gara
@@ -55,7 +55,7 @@ export async function getNextRace() {
 // ENDPOINT: Pit Stop medi per team
 // Backend: GET /api/pitstops
 export async function getPitStopStats() {
-  return get('/pitstops')
+  return get('/races/pitstops')
 }
 
 // ENDPOINT: Algoritmo di previsione risultato gara

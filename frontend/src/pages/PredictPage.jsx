@@ -1,20 +1,15 @@
-
 // src/pages/PredictPage.jsx
 //
-// Pagina "Previsione" — l'utente sceglie due scuderie e un
-// circuito, poi clicca "Calcola" per ottenere le probabilità.
+// Pagina "Previsione" - l'utente sceglie due scuderie e un
+// circuito, poi clicca "Calcola" per ottenere le probabilita'.
 //
-//    BACKEND: POST /api/predict
-//    L'algoritmo di previsione vero è nel backend.
-//    Questa pagina manda i parametri e mostra il risultato.
-//    La funzione predictResult() è in src/services/api.js
-
+// BACKEND: POST /api/predict
 
 import React, { useState, useEffect } from 'react'
 import { predictResult, getTeamStandings } from '../services/api.js'
 
-// Lista circuiti F1 2025
-// BACKEND:  questa lista viene da GET /api/circuits
+// Lista circuiti F1 corrente
+// BACKEND: questa lista viene da GET /api/circuits
 const CIRCUITS = [
   'Bahrain International Circuit',
   'Jeddah Corniche Circuit',
@@ -41,24 +36,22 @@ const CIRCUITS = [
   'Yas Marina Circuit',
 ]
 
-// Fattori speciali per circuito (visualizzati nell'analisi)
 const CIRCUIT_FACTORS = {
-  'Circuit de Monaco':        'Monaco favorisce team con ottima gestione gomme e setup aerodinamico. Fattore imprevedibilità: +15%',
-  'Silverstone Circuit':      'Silverstone premia le vetture con alto carico aerodinamico e buona trazione.',
-  'Autodromo Nazionale Monza': 'Monza favorisce i team con i motori più potenti (circuito ad alto rettilineo).',
-  'Baku City Circuit':        'Baku combina velocità e tecnica — alta imprevedibilità per incidenti da muro.',
+  'Circuit de Monaco': 'Monaco favorisce team con ottima gestione gomme e setup aerodinamico. Fattore imprevedibilita: +15%',
+  'Silverstone Circuit': 'Silverstone premia le vetture con alto carico aerodinamico e buona trazione.',
+  'Autodromo Nazionale Monza': 'Monza favorisce i team con i motori piu potenti.',
+  'Baku City Circuit': 'Baku combina velocita e tecnica con alta imprevedibilita.',
 }
 
 export default function PredictPage() {
-  const [teams, setTeams]   = useState([])
-  const [team1, setTeam1]   = useState('')
-  const [team2, setTeam2]   = useState('')
+  const [teams, setTeams] = useState([])
+  const [team1, setTeam1] = useState('')
+  const [team2, setTeam2] = useState('')
   const [circuit, setCircuit] = useState(CIRCUITS[0])
   const [result, setResult] = useState(null)
   const [loading, setLoading] = useState(false)
-  const [error, setError]   = useState('')
+  const [error, setError] = useState('')
 
-  // Carica la lista team dal backend (per popolare i select)
   useEffect(() => {
     getTeamStandings().then(t => {
       setTeams(t)
@@ -69,7 +62,6 @@ export default function PredictPage() {
     })
   }, [])
 
-  // Chiama il backend per calcolare la previsione
   async function handlePredict() {
     if (!team1 || !team2 || team1 === team2) {
       setError('Seleziona due scuderie diverse')
@@ -81,7 +73,7 @@ export default function PredictPage() {
     try {
       const res = await predictResult(team1, team2, circuit)
       setResult(res)
-    } catch (e) {
+    } catch {
       setError('Errore nella previsione. Backend connesso?')
     } finally {
       setLoading(false)
@@ -95,22 +87,14 @@ export default function PredictPage() {
       <h1 style={styles.pageTitle}>Previsione Risultato Gara</h1>
 
       <div style={styles.mainGrid}>
-
-        {/* ---- Configurazione previsione (sinistra) ---- */}
         <div className="card">
           <h3 style={styles.sectionTitle}>Configura Previsione</h3>
 
           <div style={styles.field}>
             <label className="form-label">Scuderia A</label>
             <div style={{ position: 'relative' }}>
-              <select
-                className="input-dark"
-                value={team1}
-                onChange={e => setTeam1(e.target.value)}
-              >
-                {teams.map(t => (
-                  <option key={t.id} value={t.name}>{t.name}</option>
-                ))}
+              <select className="input-dark" value={team1} onChange={e => setTeam1(e.target.value)}>
+                {teams.map(t => <option key={t.id} value={t.name}>{t.name}</option>)}
               </select>
               <span style={styles.selectArrow}>▾</span>
             </div>
@@ -119,14 +103,8 @@ export default function PredictPage() {
           <div style={styles.field}>
             <label className="form-label">Scuderia B</label>
             <div style={{ position: 'relative' }}>
-              <select
-                className="input-dark"
-                value={team2}
-                onChange={e => setTeam2(e.target.value)}
-              >
-                {teams.map(t => (
-                  <option key={t.id} value={t.name}>{t.name}</option>
-                ))}
+              <select className="input-dark" value={team2} onChange={e => setTeam2(e.target.value)}>
+                {teams.map(t => <option key={t.id} value={t.name}>{t.name}</option>)}
               </select>
               <span style={styles.selectArrow}>▾</span>
             </div>
@@ -135,30 +113,18 @@ export default function PredictPage() {
           <div style={styles.field}>
             <label className="form-label">Circuito</label>
             <div style={{ position: 'relative' }}>
-              <select
-                className="input-dark"
-                value={circuit}
-                onChange={e => setCircuit(e.target.value)}
-              >
-                {CIRCUITS.map(c => (
-                  <option key={c} value={c}>{c}</option>
-                ))}
+              <select className="input-dark" value={circuit} onChange={e => setCircuit(e.target.value)}>
+                {CIRCUITS.map(c => <option key={c} value={c}>{c}</option>)}
               </select>
               <span style={styles.selectArrow}>▾</span>
             </div>
           </div>
 
-          {/* Fattori considerati (decorativi + informativi) */}
           <div style={styles.factorsList}>
             <div style={{ fontSize: 11, textTransform: 'uppercase', letterSpacing: 1, color: '#555', marginBottom: 10 }}>
               Fattori considerati
             </div>
-            {[
-              'Forza media scuderia',
-              'Risultati stagionali',
-              'Tipo circuito',
-              'Imprevedibilità gara',
-            ].map(f => (
+            {['Forza media scuderia', 'Risultati stagionali', 'Tipo circuito', 'Imprevedibilita gara'].map(f => (
               <div key={f} style={styles.factorItem}>
                 <span style={styles.factorDot} />
                 <span>{f}</span>
@@ -173,7 +139,6 @@ export default function PredictPage() {
           </button>
         </div>
 
-        {/* ---- Risultato previsione (destra) ---- */}
         <div className="card">
           <h3 style={styles.sectionTitle}>Risultato Previsione</h3>
 
@@ -187,49 +152,36 @@ export default function PredictPage() {
 
           {result && (
             <>
-              {/* Sottotitolo */}
               <div style={{ color: '#a0a0a0', fontSize: 13, marginBottom: 20 }}>
                 {team1} vs {team2} • {circuit.split(' ').slice(-2).join(' ')}
               </div>
 
-              {/* Tre box percentuali */}
               <div style={styles.predGrid}>
-                {/* Team A */}
                 <div className="prediction-box" style={{ borderColor: '#3671C6' }}>
                   <div style={{ color: '#3671C6', fontWeight: 700, marginBottom: 4 }}>{team1}</div>
-                  <div className="prediction-pct" style={{ color: '#3671C6' }}>
-                    {result.win_team1}%
-                  </div>
+                  <div className="prediction-pct" style={{ color: '#3671C6' }}>{result.win_team1}%</div>
                   <div className="prediction-label">vittoria</div>
                 </div>
 
-                {/* Pareggio/Evento neutro */}
                 <div className="prediction-box" style={{ borderColor: '#ffd700' }}>
                   <div style={{ color: '#ffd700', fontWeight: 700, marginBottom: 4 }}>Evento<br />neutro</div>
-                  <div className="prediction-pct" style={{ color: '#ffd700' }}>
-                    {result.draw}%
-                  </div>
+                  <div className="prediction-pct" style={{ color: '#ffd700' }}>{result.draw}%</div>
                   <div className="prediction-label">pareggio</div>
                 </div>
 
-                {/* Team B */}
                 <div className="prediction-box" style={{ borderColor: '#e10600' }}>
                   <div style={{ color: '#e10600', fontWeight: 700, marginBottom: 4 }}>{team2}</div>
-                  <div className="prediction-pct" style={{ color: '#e10600' }}>
-                    {result.win_team2}%
-                  </div>
+                  <div className="prediction-pct" style={{ color: '#e10600' }}>{result.win_team2}%</div>
                   <div className="prediction-label">vittoria</div>
                 </div>
               </div>
 
-              {/* Barra distribuzione probabilità */}
               <div className="prob-bar">
-                <div className="prob-bar-a"    style={{ flex: result.win_team1 }} />
-                <div className="prob-bar-draw" style={{ flex: result.draw     }} />
-                <div className="prob-bar-b"    style={{ flex: result.win_team2 }} />
+                <div className="prob-bar-a" style={{ flex: result.win_team1 }} />
+                <div className="prob-bar-draw" style={{ flex: result.draw }} />
+                <div className="prob-bar-b" style={{ flex: result.win_team2 }} />
               </div>
 
-              {/* Analisi testo (generata dal backend) */}
               <div style={{ fontSize: 13, marginBottom: 8 }}>
                 <strong>Analisi algoritmo:</strong>
               </div>
@@ -242,7 +194,6 @@ export default function PredictPage() {
                 </div>
               )}
 
-              {/* Box affidabilità */}
               <div style={{
                 background: '#1a2a1a',
                 border: '1px solid #1f4a1f',
@@ -254,15 +205,10 @@ export default function PredictPage() {
                 fontSize: 13,
               }}>
                 <span>
-                  <strong>Affidabilità previsione: </strong>
+                  <strong>Affidabilita previsione: </strong>
                   <span style={{ color: '#00d2be' }}>{result.reliability}</span>
                 </span>
                 <div style={{ width: 28, height: 16, background: '#00d2be', borderRadius: 8 }} />
-              </div>
-
-              {/* Nota mock */}
-              <div style={{ marginTop: 12, fontSize: 12, color: '#555', fontStyle: 'italic' }}>
-                ⚠️ Dati mock: collegare il backend POST /api/predict per previsioni reali basate sui dati F1api.dev
               </div>
             </>
           )}
@@ -273,7 +219,7 @@ export default function PredictPage() {
 }
 
 const styles = {
-  pageTitle:    { fontSize: 22, fontWeight: 900, marginBottom: 24 },
+  pageTitle: { fontSize: 22, fontWeight: 900, marginBottom: 24 },
   sectionTitle: { fontSize: 16, fontWeight: 700, marginBottom: 20 },
   mainGrid: {
     display: 'grid',
@@ -304,7 +250,8 @@ const styles = {
     marginBottom: 8,
   },
   factorDot: {
-    width: 8, height: 8,
+    width: 8,
+    height: 8,
     background: '#e10600',
     borderRadius: 2,
     flexShrink: 0,

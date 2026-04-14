@@ -42,6 +42,7 @@ import {
   saveRaceResults,
   updateTeamPoints,
   ensureAdminUser,
+  deduplicateDatabase,
   closeDb,
 } from './loader/saveToDb.js'
 
@@ -61,6 +62,7 @@ async function run() {
     // ── Assicura sempre utente admin hardcoded ──────────────
     console.log('🔑 Verifica utente admin...')
     await ensureAdminUser()
+    await deduplicateDatabase()
     console.log()
 
     // ── FASE 1: Piloti e Scuderie da standings ──────────────

@@ -3,10 +3,11 @@
 // Barra di navigazione laterale sinistra.
 // Presente in tutte le pagine dopo il login.
 
-
 import React from 'react'
 import { NavLink, useNavigate } from 'react-router-dom'
 import { useAuth } from '../context/AuthContext.jsx'
+
+const CURRENT_SEASON = new Date().getFullYear()
 
 // Icone SVG inline
 const IconDashboard = () => (
@@ -41,10 +42,10 @@ const IconLogout = () => (
 
 // Voci di navigazione
 const NAV_ITEMS = [
-  { to: '/dashboard',   label: 'Dashboard',   Icon: IconDashboard },
-  { to: '/races',       label: 'Gare',         Icon: IconRaces     },
-  { to: '/predict',     label: 'Previsione',   Icon: IconPredict   },
-  { to: '/admin',       label: 'Impostazioni', Icon: IconSettings  },
+  { to: '/dashboard', label: 'Dashboard', Icon: IconDashboard },
+  { to: '/races', label: 'Gare', Icon: IconRaces },
+  { to: '/predict', label: 'Previsione', Icon: IconPredict },
+  { to: '/admin', label: 'Impostazioni', Icon: IconSettings },
 ]
 
 export default function Sidebar() {
@@ -58,19 +59,16 @@ export default function Sidebar() {
 
   return (
     <aside style={styles.sidebar}>
-      {/* Logo e titolo */}
       <div style={styles.logo}>
         <span style={styles.logoIcon}>▶</span>
         <div>
           <div style={styles.logoTitle}>FANalytics</div>
-          <div style={styles.logoSub}>Stagione 2025</div>
+          <div style={styles.logoSub}>Stagione {CURRENT_SEASON}</div>
         </div>
       </div>
 
-      {/* Voci di menu */}
       <nav style={styles.nav}>
         {NAV_ITEMS.map(({ to, label, Icon }) => {
-          // Nascondi "Impostazioni" agli utenti non-admin
           if (to === '/admin' && !isAdmin) return null
           return (
             <NavLink
@@ -88,14 +86,12 @@ export default function Sidebar() {
         })}
       </nav>
 
-      {/* Sezione utente in basso */}
       <div style={styles.userSection}>
         <div style={styles.userName}>{user?.username}</div>
         <div style={styles.userRole}>
           {isAdmin
             ? <span style={{ color: '#e10600', fontSize: 12, fontWeight: 700 }}>Amministratore</span>
-            : <span style={{ color: '#a0a0a0', fontSize: 12 }}>Utente standard</span>
-          }
+            : <span style={{ color: '#a0a0a0', fontSize: 12 }}>Utente standard</span>}
         </div>
         <button onClick={handleLogout} style={styles.logoutBtn}>
           <IconLogout />
@@ -103,16 +99,14 @@ export default function Sidebar() {
         </button>
       </div>
 
-      {/* Nota crediti */}
       <div style={styles.credits}>
-        FANalytics · Stagione 2025<br />
+        {`FANalytics · Stagione ${CURRENT_SEASON}`}<br />
         <span style={{ color: '#555' }}>Dati: F1api.dev</span>
       </div>
     </aside>
   )
 }
 
-// Stili inline per il sidebar
 const styles = {
   sidebar: {
     position: 'fixed',
