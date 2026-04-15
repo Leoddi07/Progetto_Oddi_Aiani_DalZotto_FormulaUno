@@ -110,14 +110,14 @@ export function cleanRacesFromCurrent(rawRaces) {
     if (!circNome) { console.warn(`   [cleaner] Circuito mancante in race ${race.raceId}`); continue }
 
     if (!circuitsMap.has(circNome)) {
-      // circuitLength arriva come stringa tipo "5278km" → togliamo "km"
-      const lunghezza = parseFloatSafe(
+      // circuitLength arriva come stringa tipo "5278km" → togliamo "km" e convertiamo in km
+      const lunghezzaMetri = parseFloatSafe(
         String(circ.circuitLength || '0').replace(/[^\d.]/g, '')
       )
       circuitsMap.set(circNome, {
         nome:                circNome,
         paese:               cleanDbString(circ.country, 30) || 'N/A',
-        lunghezza_tracciato: lunghezza || 0.00,
+        lunghezza_tracciato: lunghezzaMetri ? lunghezzaMetri / 1000 : 0.00,
         tipologia:           inferTipologia(circNome, circ.city),
         // indice_imprevedibilita NON inserito — gestito dall'admin
       })
