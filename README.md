@@ -298,6 +298,10 @@ MySQL — fanalytics
 > ⚠️ L'endpoint `/api/{year}/races` **non esiste** in F1api.dev.  
 > Il calendario viene da `/api/current`, che include già i vincitori di ogni gara.
 
+> ⚠️ **Limitazione critica:** L'API F1api.dev **non fornisce i dati sui pit stop**.  
+> l'endpoint `/api/{year}/{round}/pitstops` non esiste 
+> Pertanto, la sezione pit stop nel frontend non può essere implementata con dati reali.
+
 ### Operazioni di cleaning eseguite
 
 - Normalizzazione stringhe (trim, spazi multipli)
