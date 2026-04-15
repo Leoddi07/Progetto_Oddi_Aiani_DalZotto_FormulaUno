@@ -1,7 +1,7 @@
 # Progetto_Oddi_Aiani_DalZotto_FormulaUno
 
 > Piattaforma di sport analytics dedicata alla Formula 1.  
-> Progetto scolastico — Classe 5DIA, ITT Sangallo, A.S. 2025/2026  
+> Classe 5DIA, ITT Sangallo, A.S. 2025/2026  
 > **Autori:** Oddi · Aiani · Dal Zotto
 
 ---
