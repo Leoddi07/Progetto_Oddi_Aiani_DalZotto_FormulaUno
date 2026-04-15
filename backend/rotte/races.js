@@ -27,17 +27,14 @@ router.get('/', async (req, res) => {
         g.id_gara                              AS id,
         g.nome_gara_premio                     AS name,
         g.data                                 AS date,
+        g.numero_giri                          AS totalLaps,
+        ROUND(g.numero_giri * c.lunghezza_tracciato, 2) AS distanceKm,
+        g.giro_veloce                          AS fastestLap,
         c.nome                                 AS circuit,
         c.paese                                AS country,
         c.indice_imprevedibilita               AS unpredictability,
         CONCAT(p.nome, ' ', p.cognome)         AS winner,
         s.nome                                 AS winnerTeam,
-        (
-          SELECT r2.tempo_totale
-          FROM risultato r2
-          WHERE r2.id_gara_FK = g.id_gara AND r2.giro_veloce = 1
-          LIMIT 1
-        )                                      AS fastestLap,
         (
           SELECT ROUND(AVG(ps.tempo_pitstop), 2)
           FROM pitstop ps
@@ -67,6 +64,9 @@ router.get('/next', async (req, res) => {
         g.id_gara                  AS id,
         g.nome_gara_premio         AS name,
         g.data                     AS date,
+        g.numero_giri              AS totalLaps,
+        ROUND(g.numero_giri * c.lunghezza_tracciato, 2) AS distanceKm,
+        g.giro_veloce              AS fastestLap,
         c.nome                     AS circuit,
         c.paese                    AS country,
         c.indice_imprevedibilita   AS unpredictability

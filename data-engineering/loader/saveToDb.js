@@ -37,6 +37,12 @@ export async function closeDb() {
   if (pool) { await pool.end(); console.log('   [db] Connessione chiusa') }
 }
 
+export async function ensurePipelineSchema() {
+  const db = getDb()
+  await ensureColumnExists(db, 'gara', 'numero_giri', 'INT UNSIGNED NULL')
+  await ensureColumnExists(db, 'gara', 'giro_veloce', 'VARCHAR(32) NULL')
+}
+
 export async function deduplicateDatabase() {
   const db = getDb()
 
@@ -317,14 +323,27 @@ export async function saveRaces(races) {
     if (existing.length) {
       await db.query(`
         UPDATE gara
-        SET nome_gara_premio = ?, data = ?, id_circuito_FK = ?
+        SET nome_gara_premio = ?, data = ?, id_circuito_FK = ?, numero_giri = ?, giro_veloce = ?
         WHERE id_gara = ?
-      `, [race.nome_gara_premio, race.data, circuits[0].id_circuito, existing[0].id_gara])
+      `, [
+        race.nome_gara_premio,
+        race.data,
+        circuits[0].id_circuito,
+        race.laps || null,
+        race.fastLap || null,
+        existing[0].id_gara,
+      ])
     } else {
       await db.query(`
-        INSERT INTO gara (nome_gara_premio, data, id_circuito_FK)
-        VALUES (?, ?, ?)
-      `, [race.nome_gara_premio, race.data, circuits[0].id_circuito])
+        INSERT INTO gara (nome_gara_premio, data, id_circuito_FK, numero_giri, giro_veloce)
+        VALUES (?, ?, ?, ?, ?)
+      `, [
+        race.nome_gara_premio,
+        race.data,
+        circuits[0].id_circuito,
+        race.laps || null,
+        race.fastLap || null,
+      ])
     }
 
     // Recupera id_gara per poterlo usare nei risultati
@@ -520,6 +539,23 @@ async function removeDuplicateChildRows({ db, table, idColumn, keyColumns }) {
   }
 
   return removed
+}
+
+
+async function ensureColumnExists(db, tableName, columnName, definition) {
+  const [rows] = await db.query(`
+    SELECT 1
+    FROM information_schema.COLUMNS
+    WHERE TABLE_SCHEMA = DATABASE()
+      AND TABLE_NAME = ?
+      AND COLUMN_NAME = ?
+    LIMIT 1
+  `, [tableName, columnName])
+
+  if (!rows.length) {
+    await db.query(`ALTER TABLE \`${tableName}\` ADD COLUMN \`${columnName}\` ${definition}`)
+    console.log(`   [db] Colonna aggiunta: ${tableName}.${columnName}`)
+  }
 }
 
 function inferDevelopmentUnpredictability(name, type) {

@@ -22,6 +22,7 @@ import {
   saveRaceResults,
   updateTeamPoints,
   ensureAdminUser,
+  ensurePipelineSchema,
   deduplicateDatabase,
   applyDevelopmentIndexes,
   closeDb,
@@ -41,6 +42,7 @@ async function run() {
   try {
     console.log('🔑 Verifica utente admin...')
     await ensureAdminUser()
+    await deduplicateDatabase()
     await deduplicateDatabase()
     console.log()
 

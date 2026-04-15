@@ -9,6 +9,10 @@ function fmtDate(dateStr) {
   return new Date(dateStr).toLocaleDateString('it-IT', { day: '2-digit', month: 'short' })
 }
 
+function formatDistance(distanceKm) {
+  return distanceKm ? `${Number(distanceKm).toFixed(2)} km` : '-'
+}
+
 function formatPitStop(value) {
   return value == null ? '-' : `${Number(value).toFixed(2)}s`
 }
@@ -30,8 +34,8 @@ function RaceDetail({ race, results }) {
         {[
           { label: 'Vincitore', value: results[0]?.driverName || race.winner || '-' },
           { label: 'Team', value: results[0]?.team || race.winnerTeam || '-' },
-          { label: 'Giri totali', value: '-' },
-          { label: 'Distanza', value: '-' },
+          { label: 'Giri totali', value: race.totalLaps || '-' },
+          { label: 'Distanza', value: formatDistance(race.distanceKm) },
           { label: 'Giro veloce', value: formatFastestLap(race.fastestLap) },
         ].map(({ label, value }) => (
           <div key={label}>

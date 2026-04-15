@@ -33,6 +33,8 @@ CREATE TABLE `gara` (
   `id_gara` INT UNSIGNED NOT NULL AUTO_INCREMENT,
   `nome_gara_premio` VARCHAR(30) NOT NULL,
   `data` DATE NOT NULL,
+  `numero_giri` INT UNSIGNED NULL,
+  `giro_veloce` VARCHAR(32) NULL,
   `id_circuito_FK` INT UNSIGNED NOT NULL,
   PRIMARY KEY (`id_gara`),
   CONSTRAINT `gara_ibfk_1`
